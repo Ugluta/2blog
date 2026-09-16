@@ -4,3 +4,6 @@ export * from "./rbac";
 export * from "./taxonomy";
 export * from "./content";
 export * from "./media";
+export * from "./projects";
+export * from "./services";
+export * from "./works";

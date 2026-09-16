@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, eq, gt, inArray, isNull } from "drizzle-orm";
-import { schema, type Database } from "@2blog/core-database";
+import { schema, type Database, type Transaction } from "@2blog/core-database";
 import { ContentTypeRegistry, UnknownContentTypeError, assertValidContentTransition, InvalidContentTransitionError } from "@2blog/core-content-engine";
 import type {
   CreateContentInput,
@@ -21,7 +21,18 @@ export class ContentService {
     @Inject(CONTENT_TYPE_REGISTRY) private readonly typeRegistry: ContentTypeRegistry,
   ) {}
 
-  async create(input: CreateContentInput, authorId: string): Promise<Content> {
+  /**
+   * `onCreated` lets a domain module (ProjectsService, ...) write its
+   * extension-table row in the *same* transaction as the content insert —
+   * Core stays generic (it never imports project_details/service_details/
+   * work_details), the domain module stays responsible for its own table,
+   * and the two inserts are still atomic (ARCHITECTURE.md madde 5).
+   */
+  async create(
+    input: CreateContentInput,
+    authorId: string,
+    onCreated?: (tx: Transaction, contentId: string) => Promise<void>,
+  ): Promise<Content> {
     const definition = this.getTypeDefinitionOrThrow(input.typeKey);
     const parsedExtra = definition.extraFieldsSchema.safeParse(input.extraFields);
     if (!parsedExtra.success) {
@@ -55,6 +66,7 @@ export class ContentService {
         .returning();
 
       await this.syncTaxonomies(tx, created!.id, input.categoryIds, input.tagIds);
+      if (onCreated) await onCreated(tx, created!.id);
       await this.snapshotRevision(tx, created!, authorId);
       return created!;
     });
@@ -62,7 +74,12 @@ export class ContentService {
     return this.serialize(row);
   }
 
-  async update(id: string, input: UpdateContentInput, editorId: string): Promise<Content> {
+  async update(
+    id: string,
+    input: UpdateContentInput,
+    editorId: string,
+    onUpdated?: (tx: Transaction, contentId: string) => Promise<void>,
+  ): Promise<Content> {
     const existing = await this.getRowOrThrow(id);
     if (input.categoryIds || input.tagIds) {
       await this.assertTaxonomyExists(input.categoryIds, input.tagIds);
@@ -91,6 +108,7 @@ export class ContentService {
           replaceTags: Boolean(input.tagIds),
         });
       }
+      if (onUpdated) await onUpdated(tx, existing.id);
       await this.snapshotRevision(tx, updated!, editorId);
       return updated!;
     });
@@ -145,12 +163,19 @@ export class ContentService {
     return this.serialize(rows[0]);
   }
 
-  async list(query: ContentListQuery): Promise<CursorPage<Content>> {
-    return this.listInternal(query.limit, query.cursor, query.typeKey, query.status, query.categoryId);
+  /**
+   * `restrictToIds` is for domain services (ProjectsService, ServicesService,
+   * ...) that need to filter by a taxonomy Core doesn't know about — e.g.
+   * Services' own `service_categories`, which is a different table from
+   * Core's generic `categories`. The domain service resolves its own ids
+   * and passes them in; Core never learns what service_categories is.
+   */
+  async list(query: ContentListQuery, restrictToIds?: string[]): Promise<CursorPage<Content>> {
+    return this.listInternal(query.limit, query.cursor, query.typeKey, query.status, query.categoryId, restrictToIds);
   }
 
-  async listPublic(query: PublicContentListQuery): Promise<CursorPage<Content>> {
-    return this.listInternal(query.limit, query.cursor, query.typeKey, "PUBLISHED", query.categoryId);
+  async listPublic(query: PublicContentListQuery, restrictToIds?: string[]): Promise<CursorPage<Content>> {
+    return this.listInternal(query.limit, query.cursor, query.typeKey, "PUBLISHED", query.categoryId, restrictToIds);
   }
 
   private async listInternal(
@@ -159,11 +184,15 @@ export class ContentService {
     typeKey: string | undefined,
     status: ContentStatus | undefined,
     categoryId: string | undefined,
+    restrictToIds?: string[],
   ): Promise<CursorPage<Content>> {
+    if (restrictToIds && restrictToIds.length === 0) return { items: [], nextCursor: null };
+
     const conditions = [isNull(schema.contents.deletedAt)];
     if (cursor) conditions.push(gt(schema.contents.id, cursor));
     if (typeKey) conditions.push(eq(schema.contents.typeKey, typeKey));
     if (status) conditions.push(eq(schema.contents.status, status));
+    if (restrictToIds) conditions.push(inArray(schema.contents.id, restrictToIds));
 
     let contentIdsForCategory: string[] | null = null;
     if (categoryId) {
@@ -225,9 +254,8 @@ export class ContentService {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private async syncTaxonomies(
-    tx: any,
+    tx: Transaction,
     contentId: string,
     categoryIds: string[],
     tagIds: string[],
@@ -247,8 +275,7 @@ export class ContentService {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private async snapshotRevision(tx: any, row: ContentRow, editedBy: string): Promise<void> {
+  private async snapshotRevision(tx: Transaction, row: ContentRow, editedBy: string): Promise<void> {
     await tx.insert(schema.contentRevisions).values({
       contentId: row.id,
       title: row.title,

@@ -76,6 +76,31 @@ PostgreSQL'de tutulmaz; DB yalnızca metadata (`storageKey`, `mimeType`,
 - Bucket + public-read policy API bootstrap'ında otomatik oluşturulur
   (`StorageModule`, idempotent).
 
+## Projects / Services / Works
+
+Content Engine'in "extension table" mekanizmasının gerçek örneği (bkz.
+`docs/ARCHITECTURE.md` madde 5, 8) — her biri `contents` satırı (generic
+title/slug/SEO/workflow) + kendi extension tablosu (`project_details`,
+`service_details`, `work_details`, 1:1 CASCADE FK). `ContentService.create/
+update` artık domain modüllerinin aynı transaction içinde kendi tablosuna
+yazabileceği bir `onCreated`/`onUpdated` callback kabul ediyor — Core hâlâ
+`project_details` diye bir şey bilmiyor.
+
+- `/projects`, `/services`, `/works` — aynı CRUD + `/​:id/transition` +
+  `/public` deseni, `content.controller.ts` ile birebir aynı izinler
+  (`CONTENT_VIEW/CREATE/EDIT/DELETE` + `PUBLISHED` için `CONTENT_PUBLISH`).
+- **Editoryal durum ≠ domain durumu**: `content.status` (DRAFT..PUBLISHED)
+  ile `project.projectStatus` (CONCEPT..ARCHIVED, projenin gerçek hayattaki
+  ilerlemesi) tamamen bağımsız — bir proje `PUBLISHED` yazıyla anlatılırken
+  hâlâ `DEVELOPMENT` durumunda olabilir.
+- `/service-categories` (`GET` herkese açık, `POST` `CONTENT_EDIT`) — Core'un
+  genel `categories` tablosundan **ayrı**, Services'e özel bir hiyerarşi.
+  `ContentService.list/listPublic` artık domain servislerinin kendi
+  taksonomisiyle (Core'un bilmediği bir tabloyla) filtreleyebilmesi için
+  opsiyonel bir `restrictToIds` parametresi kabul ediyor.
+- Works kasıtlı olarak daha gevşek: `category` düz bir string, ayrı bir
+  tablo yok (master prompt madde 6: "aynı veri modeli olmak zorunda değil").
+
 ## Gereksinimler
 
 - Node.js ≥ 20

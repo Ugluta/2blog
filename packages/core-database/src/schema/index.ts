@@ -11,3 +11,7 @@ export * from "./content-revisions";
 export * from "./content-categories";
 export * from "./content-tags";
 export * from "./media";
+export * from "./project-details";
+export * from "./service-categories";
+export * from "./service-details";
+export * from "./work-details";

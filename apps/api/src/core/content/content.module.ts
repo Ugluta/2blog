@@ -10,5 +10,6 @@ import { TaxonomyService } from "./taxonomy.service";
   imports: [ContentTypeRegistryModule],
   controllers: [ContentController, PublicContentController, TaxonomyController],
   providers: [ContentService, TaxonomyService],
+  exports: [ContentService],
 })
 export class ContentModule {}

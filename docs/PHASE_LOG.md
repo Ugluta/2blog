@@ -183,3 +183,77 @@ oluşturulmadı; image/video processing BullMQ job'ı PHASE 12-14'te), width/
 height/duration alanları hâlâ `null` (ffprobe/sharp entegrasyonu yok),
 büyük dosyalar için chunked/resumable upload, `ContentMedia` join tablosu
 (content'lerin galeri/çoklu medya ilişkisi — `coverImage` hâlâ düz URL string).
+
+## PHASE 8 — Projects / Services / Works (tamamlandı)
+
+**Content Engine'e eklenen mekanizma:** `ContentService.create`/`update`
+artık opsiyonel bir `onCreated`/`onUpdated` callback kabul ediyor —
+`(tx, contentId) => Promise<void>`, aynı transaction içinde çağrılıyor.
+Bu, PHASE 6/7'de kasıtlı olarak eksik bırakılan "extension table" bağlama
+noktasını tamamlıyor: domain modülü kendi tablosuna atomically yazabiliyor,
+Core ise hangi tabloya yazıldığını hiç bilmiyor. `Transaction` tipi
+(`packages/core-database`) Drizzle'ın `db.transaction()` callback imzasından
+çıkarıldı (elle yazılmadı) ki asla gerçek tipten sapmasın. Ayrıca
+`ContentService.list/listPublic` domain servislerinin kendi taksonomisiyle
+(Core'un bilmediği bir tabloyla, örn. `service_categories`) filtreleyebilmesi
+için opsiyonel bir `restrictToIds: string[]` parametresi kazandı.
+
+**Yeni core-database tabloları:** `project_details` (+ `project_status` enum:
+CONCEPT/PLANNING/DEVELOPMENT/COMPLETED/MAINTENANCE/ARCHIVED — kasıtlı olarak
+`contents.status` editoryal workflow'undan ayrı), `service_categories`
+(Core'un genel `categories`'inden ayrı, Services'e özel hiyerarşi),
+`service_details` (`features`/`process` text[], `faq` jsonb), `work_details`
+(kasıtlı daha gevşek — `category` düz string, ayrı tablo yok).
+
+**apps/api'ye eklenenler (`src/blog/`):** `projects/`, `services/`, `works/`
+— her biri: Service (generic content alanlarını extension alanlarından ayırıp
+`ContentService`'e delege eden, sonucu extension satırıyla birleştiren),
+admin Controller (`CONTENT_VIEW/CREATE/EDIT/DELETE` + transition'da
+`PUBLISHED` için ekstra `CONTENT_PUBLISH`), guard'sız Public Controller
+(`/projects/public`, `/services/public`, `/works/public` — sadece
+`PUBLISHED`), Module. `blog.module.ts` artık "post"a ek olarak "project",
+"service", "work" tiplerini de registry'ye kaydediyor (extraFieldsSchema
+boş — gerçek alanlar generic `/content` extraFields yolundan değil, doğrudan
+extension tablosundan geçiyor).
+
+**Bilinçli tasarım kararı — domain-özel izin yok:** Master prompt örnek olarak
+`PROJECT_CREATE`, `PROJECT_EDIT` gibi ince taneli izinler gösteriyor, ama bu
+faz Core'un genel `CONTENT_VIEW/CREATE/EDIT/DELETE/PUBLISH` izinlerini
+Projects/Services/Works için de kullanıyor — domain-özel izin anahtarlarının
+nereden seed edileceği (seed script Core paketinde, apps/api'den import
+edemez) ayrı bir alt-sistem gerektirir; bu, extension-table mekanizmasını
+kanıtlamak olan bu fazın kapsamı dışında bırakıldı.
+
+**Doğrulama (gerçek PostgreSQL + Redis'e karşı, Docker olmadan):**
+- Migration uygulandı (4 yeni tablo + `project_status` enum), seed yeniden
+  çalıştı (idempotent)
+- Gerçek bir Project oluşturdum (technologies text[], demoUrl, startDate
+  dahil) — tek istekte hem `contents` hem `project_details` satırı atomically
+  yazıldığını doğruladım
+- `content.status` (DRAFT) ile `projectStatus` (DEVELOPMENT) bağımsız
+  olduğunu doğruladım; publish sonrası `content.status=PUBLISHED` ama
+  `projectStatus` değişmedi
+- Kısmi PATCH (`sadece endDate+projectStatus`) → `problem`/`technologies`
+  gibi dokunulmayan alanlar korundu
+- **Cross-type guard:** bir project id'sini `/services/:id`'den çekmeye
+  çalıştım → 404 ("Service not found") — content id'leri type-scoped değil,
+  `assertIsService`/`assertIsProject` bunu engelliyor
+- Service kategorisi oluşturup bir Service'e bağladım, `?categoryId=`
+  filtresinin gerçekten `service_categories`'i kullandığını (Core'un genel
+  `categories`'ini değil) doğruladım — yanlış/var olmayan bir kategori id'si
+  boş liste döndürdü, doğru id 1 sonuç döndürdü
+- Work oluşturdum (jsonb `links` array dahil)
+- Domain tipleri arasında **tek slug namespace'i** doğrulandı: bir work'ü,
+  var olan bir project'le aynı slug'la oluşturmaya çalışınca → 409
+- `CONTENT_CREATE` izni olmayan MEMBER rolüyle `POST /works` → 403
+- Geçersiz `projectStatus` enum değeri → 400 (zod); geçersiz content-status
+  geçişi (`DRAFT → ARCHIVED`, workflow grafiğinde yok) → 400
+- Soft-delete sonrası `project_details` satırının DB'de hâlâ var olduğunu
+  doğruladım (CASCADE gerçek `DELETE`'te tetiklenir, soft-delete sadece
+  `deletedAt` set eder — kasıtlı, geri alınabilirlik için)
+
+**Kapsam dışı bırakılanlar (sonraki fazlar):** Domain-özel ince taneli izinler
+(`PROJECT_CREATE` vb. — yukarıda açıklandı), Project/Work galeri desteği
+(`ContentMedia` join tablosu, Media modülü artık hazır ama bu faz kapsamında
+değildi), Services'in `process` alanının yapılandırılmış adım listesi yerine
+düz string[] olması, apps/web'in bu endpoint'leri gerçekten render etmesi.

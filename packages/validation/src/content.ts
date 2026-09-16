@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { CONTENT_STATUSES } from "@2blog/types";
 
-const slugSchema = z
+export const slugSchema = z
   .string()
   .min(1)
   .max(255)
@@ -13,8 +13,13 @@ const typeKeySchema = z
   .max(50)
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "typeKey must be lowercase, hyphen-separated");
 
-export const createContentSchema = z.object({
-  typeKey: typeKeySchema,
+/**
+ * Shared by every content type's create/update DTO (generic Content Engine
+ * fields). Domain schemas for Project/Service/Work `.extend()` this instead
+ * of repeating it (ARCHITECTURE.md madde 5 — the extension table only adds
+ * to what's here, never replaces it).
+ */
+export const contentBaseFieldsSchema = z.object({
   title: z.string().min(1).max(255),
   slug: slugSchema,
   excerpt: z.string().max(1000).optional(),
@@ -26,6 +31,10 @@ export const createContentSchema = z.object({
   noindex: z.boolean().default(false),
   categoryIds: z.array(z.string().uuid()).default([]),
   tagIds: z.array(z.string().uuid()).default([]),
+});
+
+export const createContentSchema = contentBaseFieldsSchema.extend({
+  typeKey: typeKeySchema,
   extraFields: z.record(z.string(), z.unknown()).default({}),
 });
 

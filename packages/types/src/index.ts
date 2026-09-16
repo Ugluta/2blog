@@ -2,3 +2,6 @@ export * from "./api";
 export * from "./identity";
 export * from "./content";
 export * from "./media";
+export * from "./projects";
+export * from "./services";
+export * from "./works";
