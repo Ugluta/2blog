@@ -15,6 +15,13 @@
       "when": 1789554508819,
       "tag": "0001_sticky_argent",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789555443889,
+      "tag": "0002_married_mole_man",
+      "breakpoints": true
     }
   ]
 }

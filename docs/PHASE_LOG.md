@@ -125,3 +125,61 @@ tabloları ve bunların `extraFieldsSchema`'ları (PHASE 8), `ContentMedia`
 join tablosu (Media modülü kurulana kadar `coverImage` düz URL string,
 PHASE 9), arama/SEO sitemap entegrasyonu (PHASE 10-11), apps/web'in gerçek
 bir Blog sayfası render etmesi (bu faz yalnızca API'yi kapsıyor).
+
+## PHASE 9 — Media (tamamlandı)
+
+**Yeni paket:** `packages/core-media` — framework-agnostic: `StorageProvider`
+arayüzü + `S3StorageProvider` (`@aws-sdk/client-s3`, `forcePathStyle: true` —
+MinIO bugün, R2/AWS S3 ileride sadece config değişikliğiyle), magic-byte
+sniffing (`sniffMimeType` — küçük/sabit allowlist için elle yazıldı; güncel
+"detect file type" npm paketlerinin hepsi ESM-only olup bu paketin CJS
+build'iyle çakıştığından bir kütüphane yerine tercih edildi), mime↔kind/uzantı
+haritası (SVG kasıtlı olarak IMAGE'a dahil edilmedi — script gömülebilir,
+XSS vektörü), `sanitizeDisplayFilename` (yalnızca görüntüleme amaçlı; storage
+key'i asla kullanıcı dosya adından türetilmiyor).
+
+**core-database'e eklenen:** `media` tablosu — `hash` alanı **unique**
+(aynı bytes'ı tekrar yüklemek yeni satır/nesne oluşturmaz, master prompt
+madde 8: "aynı veriyi tekrar tekrar kaydetme").
+
+**apps/api'ye eklenenler:**
+- `core/media/storage.module.ts` — `Global`, boot'ta `StorageProvider`
+  oluşturup `ensureBucket()` çağırır (bucket yoksa oluşturur + public-read
+  policy uygular); storage erişilemezse API fail-fast başlamaz (DatabaseModule
+  ile aynı duruş).
+- `core/media/media.service.ts` — upload (boyut limiti `MEDIA_MAX_UPLOAD_MB`,
+  magic-byte doğrulama, sha256 hash ile dedupe + eşzamanlı upload yarışına
+  karşı unique-constraint fallback'i), update (altText/caption), remove
+  (hem storage nesnesini hem DB satırını siler), list (cursor + kind filtresi).
+- `core/media/media.controller.ts` — `@fastify/multipart` ile gerçek dosya
+  upload'ı (`POST /media/upload`), `MEDIA_VIEW/UPLOAD/EDIT/DELETE` izinleri.
+- Yeni Core izinleri: `MEDIA_VIEW`, `MEDIA_UPLOAD`, `MEDIA_EDIT`, `MEDIA_DELETE`
+- `main.ts`'e `@fastify/multipart` kaydı (`MEDIA_MAX_UPLOAD_MB` limitiyle)
+
+**Doğrulama:** Bu ortamda gerçek MinIO/Docker yok; bunun yerine **s3rver**
+(gerçek bir S3-compatible HTTP sunucusu, npm'den — mock değil, gerçek
+protokolü konuşan bir test double) yerel olarak ayağa kaldırıldı ve API
+gerçekten ona karşı çalıştırıldı:
+- Gerçek bir PNG dosyasını `multipart/form-data` ile HTTP üzerinden yükledim;
+  API doğru şekilde `image/png` tespit etti, storage'a yazdı, DB satırı oluştu
+- Döndürülen public URL'den dosyayı indirdim → orijinal dosyayla **byte-byte
+  aynı** olduğunu doğruladım (gerçek upload/serve round-trip)
+- Sahte dosya (düz metin, `.png` uzantılı, `Content-Type: image/png` iddiasıyla)
+  → 400 (magic-byte kontrolü client'ın beyanını değil gerçek bytes'ı esas aldı)
+- Aynı PNG'yi tekrar yükledim → aynı media id döndü (dedupe çalıştı, ikinci bir
+  storage nesnesi oluşmadı)
+- `MEDIA_UPLOAD` izni olmayan MEMBER rolüyle upload denemesi → 403
+- Silme sonrası hem DB satırı (`GET /:id` → 404) hem storage nesnesi
+  (public URL → 404) gerçekten kayboldu
+- **Not:** s3rver `PutBucketPolicy` API'sini implemente etmiyor (gerçek
+  MinIO/S3 eder) — bu tek adımı geçici bir env flag'iyle atlayıp test ettim,
+  sonrasında flag'i koddan tamamen geri aldım (commit'te yok). Bucket policy
+  çağrısının kendisi standart, iyi belgelenmiş bir S3 API'si; gerçek MinIO'ya
+  karşı ayrı bir doğrulama gerektirir (ilk gerçek deployment'ta doğrulanmalı).
+
+**Kapsam dışı bırakılanlar (sonraki fazlar):** Otomatik thumbnail/varyant
+üretimi (`media_variants` tablosu — henüz üreticisi olmadığı için hiç
+oluşturulmadı; image/video processing BullMQ job'ı PHASE 12-14'te), width/
+height/duration alanları hâlâ `null` (ffprobe/sharp entegrasyonu yok),
+büyük dosyalar için chunked/resumable upload, `ContentMedia` join tablosu
+(content'lerin galeri/çoklu medya ilişkisi — `coverImage` hâlâ düz URL string).

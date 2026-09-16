@@ -20,6 +20,7 @@ packages/
   core-auth/              argon2id, access/refresh token, rotation yardımcıları
   core-rbac/                hasPermission() + Core izin registry'si
   core-content-engine/        content workflow state machine + type registry
+  core-media/                   StorageProvider abstraction (S3/MinIO), mime sniffing
 ```
 
 ## Auth & RBAC (PHASE 3)
@@ -55,6 +56,25 @@ registry'ye kendi domain modüllerinden kaydeder.
   ilişki (`content_categories`, `content_tags`).
 - Durum akışı: `DRAFT → REVIEW → APPROVED → SCHEDULED → PUBLISHED → ARCHIVED`
   (`packages/core-content-engine`'de tanımlı, geçersiz geçişler 400 döner).
+
+## Media
+
+`packages/core-media` içinde `StorageProvider` arayüzü + S3-compatible
+implementasyon (bkz. `docs/ARCHITECTURE.md` madde 13) — bugün MinIO, ileride
+Cloudflare R2/AWS S3'e config değişikliğiyle geçilebilir. Dosya bytes'ı
+PostgreSQL'de tutulmaz; DB yalnızca metadata (`storageKey`, `mimeType`,
+`size`, `hash`, `altText`, `caption`, `ownerId`) tutar.
+
+- `POST /api/v1/media/upload` (`multipart/form-data`) — client'ın Content-Type
+  beyanı **hiçbir zaman güvenilmez**; gerçek dosya tipi magic-byte sniffing
+  ile tespit edilir, eşleşmezse (spoofed uzantı) 400 döner.
+- Aynı dosya (aynı sha256 hash) tekrar yüklenirse **dedupe** edilir — yeni
+  storage nesnesi/DB satırı oluşmaz, mevcut medya döner.
+- `GET /api/v1/media`, `GET /api/v1/media/:id`, `PATCH /api/v1/media/:id`
+  (altText/caption), `DELETE /api/v1/media/:id` — `MEDIA_VIEW/UPLOAD/EDIT/DELETE`
+  izinleriyle korunur. Silme, storage nesnesini de gerçekten siler.
+- Bucket + public-read policy API bootstrap'ında otomatik oluşturulur
+  (`StorageModule`, idempotent).
 
 ## Gereksinimler
 

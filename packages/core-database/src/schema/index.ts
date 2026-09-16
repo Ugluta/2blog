@@ -10,3 +10,4 @@ export * from "./contents";
 export * from "./content-revisions";
 export * from "./content-categories";
 export * from "./content-tags";
+export * from "./media";

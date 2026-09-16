@@ -48,6 +48,7 @@ export const apiEnvSchema = nodeEnvSchema
       .string()
       .default("")
       .transform((value) => value.split(",").map((origin) => origin.trim()).filter(Boolean)),
+    MEDIA_MAX_UPLOAD_MB: z.coerce.number().int().positive().default(25),
   });
 
 export const workerEnvSchema = nodeEnvSchema
