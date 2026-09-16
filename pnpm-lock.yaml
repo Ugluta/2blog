@@ -54,6 +54,9 @@ importers:
       '@2blog/core-auth':
         specifier: workspace:*
         version: link:../../packages/core-auth
+      '@2blog/core-content-engine':
+        specifier: workspace:*
+        version: link:../../packages/core-content-engine
       '@2blog/core-database':
         specifier: workspace:*
         version: link:../../packages/core-database
@@ -189,6 +192,22 @@ importers:
         specifier: ^5.7.2
         version: 5.9.3
 
+  packages/core-content-engine:
+    dependencies:
+      '@2blog/types':
+        specifier: workspace:*
+        version: link:../types
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.5
+        version: 22.20.3
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
   packages/core-database:
     dependencies:
       '@2blog/config':
@@ -240,6 +259,9 @@ importers:
 
   packages/validation:
     dependencies:
+      '@2blog/types':
+        specifier: workspace:*
+        version: link:../types
       zod:
         specifier: ^3.24.1
         version: 3.25.76

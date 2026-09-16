@@ -70,3 +70,58 @@ Next.js route handler üzerinden refresh token'ı httpOnly cookie'ye koyan BFF
 katmanı — ARCHITECTURE.md madde 2), domain'lere özel izinler (`BLOG_PUBLISH` vb.,
 PHASE 7-8), users listesinde createdAt bazlı kronolojik cursor (şu an id bazlı,
 kararlı ama kronolojik değil).
+
+## PHASE 6/7 — Content Engine + Blog "post" tipi (tamamlandı)
+
+**Yeni paket:** `packages/core-content-engine` — framework-agnostic:
+`ContentTypeRegistry` (Core, domain tiplerini bilmez; `register()`/`get()`/`has()`),
+durum geçiş grafiği (`DRAFT → REVIEW → APPROVED → SCHEDULED → PUBLISHED → ARCHIVED`,
+`DRAFT → PUBLISHED` doğrudan da mümkün — zorunlu review gate yok ama REVIEW/APPROVED
+kullanmak isteyen ekipler için yol açık).
+
+**core-database'e eklenenler:** `categories`, `tags`, `contents` (generic —
+`typeKey` düz varchar, DB enum değil, çünkü domain modülleri bootstrap'ta
+kendi tiplerini kaydediyor), `content_revisions` (her create/update/transition'da
+snapshot), `content_categories`/`content_tags` (many-to-many join tabloları).
+
+**apps/api'ye eklenenler:**
+- `core/content/` — `ContentTypeRegistryModule` (Global, tek registry instance'ı,
+  domain modülleri `OnModuleInit`'te buraya kayıt olur), `ContentService`
+  (create/update/transition/soft-delete, taxonomy senkronizasyonu transaction
+  içinde, cursor pagination + kategori filtresi), `ContentController` (admin,
+  `CONTENT_VIEW/CREATE/EDIT/DELETE` + `PUBLISHED`'a özel `CONTENT_PUBLISH`),
+  `PublicContentController` (**guard'sız**, yalnızca `PUBLISHED`, `apps/web`'in
+  SSR'da çağıracağı yüzey), `TaxonomyController`/`TaxonomyService` (kategori/etiket)
+- `src/blog/blog.module.ts` — Core'un ilk domain tüketicisi: bootstrap'ta
+  registry'ye `"post"` tipini kaydeder (boş `extraFieldsSchema` — henüz ek alan
+  yok). Core hiçbir yerde bu modülü import etmiyor; ilişki tek yönlü.
+- Yeni Core izinleri: `CONTENT_VIEW`, `CONTENT_CREATE`, `CONTENT_EDIT`,
+  `CONTENT_DELETE`, `CONTENT_PUBLISH`
+
+**Doğrulama (gerçek PostgreSQL + Redis'e karşı, Docker olmadan):**
+- Migration uygulandı (6 yeni tablo + `content_status` enum), seed yeniden
+  çalıştırıldı (idempotent — yeni CONTENT_* izinlerini mevcut SUPER_ADMIN'e ekledi)
+- Kayıtsız `typeKey` ile içerik oluşturma → 400
+- Kategori + etiket oluşturup gerçek bir `"post"` içeriği oluşturdum (DRAFT,
+  kategoriler/etiketler doğru döndü)
+- Public endpoint DRAFT içeriği göstermedi (boş liste + `/public/:slug` 404)
+- `CONTENT_EDIT`/`CONTENT_PUBLISH` izni olmayan MEMBER rolüyle transition denemesi
+  → 403
+- Admin `DRAFT → PUBLISHED` transition yaptı → `publishedAt` set edildi, public
+  liste ve `/public/:slug` artık içeriği gösterdi
+- Geçersiz geçiş denemesi (`PUBLISHED → APPROVED`, geçiş grafiğinde yok) → 400
+  ("Cannot transition content from PUBLISHED to APPROVED")
+- **Bulunan ve düzeltilen bug:** duplicate slug ile içerik oluşturma başta
+  ham Postgres unique-constraint hatasından 500 dönüyordu — `ContentService.create`'e
+  slug ön-kontrolü eklenip 409'a çevrildi, ayrıca `updateContentSchema`'dan
+  `slug` tamamen çıkarıldı (PATCH'te sessizce yok sayılıyordu; artık şemada
+  hiç kabul edilmiyor — slug değişikliği SEO redirect'siz güvenli değil)
+- Revision snapshot'ları her create/update/transition'da `content_revisions`'a
+  gerçekten yazıldığını SQL ile doğruladım; soft-delete sonrası hem admin
+  `GET /:id` hem public liste/slug 404/boş döndü
+
+**Kapsam dışı bırakılanlar (sonraki fazlar):** Project/Service/Work extension
+tabloları ve bunların `extraFieldsSchema`'ları (PHASE 8), `ContentMedia`
+join tablosu (Media modülü kurulana kadar `coverImage` düz URL string,
+PHASE 9), arama/SEO sitemap entegrasyonu (PHASE 10-11), apps/web'in gerçek
+bir Blog sayfası render etmesi (bu faz yalnızca API'yi kapsıyor).

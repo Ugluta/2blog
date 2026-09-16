@@ -12,6 +12,7 @@
   "dependencies": {
     "@2blog/config": "workspace:*",
     "@2blog/core-auth": "workspace:*",
+    "@2blog/core-content-engine": "workspace:*",
     "@2blog/core-database": "workspace:*",
     "@2blog/core-rbac": "workspace:*",
     "@2blog/types": "workspace:*",

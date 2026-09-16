@@ -1,0 +1,1 @@
+export const CONTENT_TYPE_REGISTRY = Symbol("CONTENT_TYPE_REGISTRY");

@@ -19,6 +19,7 @@ packages/
   core-database/        Drizzle schema + client (PostgreSQL) + seed script
   core-auth/              argon2id, access/refresh token, rotation yardımcıları
   core-rbac/                hasPermission() + Core izin registry'si
+  core-content-engine/        content workflow state machine + type registry
 ```
 
 ## Auth & RBAC (PHASE 3)
@@ -35,6 +36,25 @@ packages/
 pnpm db:migrate  # şemayı uygula
 SEED_ADMIN_EMAIL=admin@example.com SEED_ADMIN_PASSWORD=... pnpm db:seed
 ```
+
+## Content Engine
+
+Generic, tip registry tabanlı (bkz. `docs/ARCHITECTURE.md` madde 5) — Core
+`typeKey` string'i ve zod şeması dışında hiçbir domain tipini bilmez. Blog
+domain modülü (`apps/api/src/blog`) bootstrap'ta `"post"` tipini kaydeder;
+Evrak/Koli/2e Music gibi gelecekteki uygulamalar kendi tiplerini aynı
+registry'ye kendi domain modüllerinden kaydeder.
+
+- `GET/POST /api/v1/content`, `GET/PATCH/DELETE /api/v1/content/:id`,
+  `POST /api/v1/content/:id/transition` — `CONTENT_VIEW/CREATE/EDIT/DELETE`
+  izinleriyle korunur; `PUBLISHED`'a geçiş ayrıca `CONTENT_PUBLISH` ister.
+- `GET /api/v1/content/public`, `GET /api/v1/content/public/:slug` — **guard'sız**,
+  yalnızca `PUBLISHED` içerik döner. `apps/web`'in SSR sırasında çağıracağı
+  yer burasıdır (madde 2/3: web asla DB'ye doğrudan bağlanmaz).
+- `GET/POST /api/v1/categories`, `GET/POST /api/v1/tags` — many-to-many
+  ilişki (`content_categories`, `content_tags`).
+- Durum akışı: `DRAFT → REVIEW → APPROVED → SCHEDULED → PUBLISHED → ARCHIVED`
+  (`packages/core-content-engine`'de tanımlı, geçersiz geçişler 400 döner).
 
 ## Gereksinimler
 
