@@ -162,9 +162,26 @@ paneli. `apps/web` gibi hiçbir zaman DB'ye doğrudan bağlanmıyor, her şey
 - **Medya (`/medya`):** dosya yükleme (`apiFetchForm`, multipart) ve
   silme; grid'de görsellerin gerçek önizlemesi, diğer türler için kind
   etiketi.
-- **Kapsam dışı bırakılanlar (sonraki fazlar):** Projects/Services/Works
-  admin UI, Users/Roles admin UI, Settings/Menü admin UI, dark mode —
-  hepsi API tarafında zaten var, sadece admin arayüzü yazılmadı.
+- **Projelerimiz / Hizmetler / Yaptıklarımız:** İçerik ile aynı CRUD +
+  workflow deseni (`ContentStatusBar`, `ContentBaseFields` paylaşılan
+  component'leri üzerinden), her biri kendi domain alanlarıyla:
+  - Projeler: problem/çözüm, teknolojiler, demo/repo linkleri, müşteri,
+    proje durumu (`PROJECT_STATUSES` — editoryal `status`'tan bağımsız).
+  - Hizmetler: kategori seçimi + `/hizmetler` sayfasında inline kategori
+    oluşturma formu, özellikler/süreç/SSS listeleri, CTA.
+  - Yaptıklarımız: kategori (serbest metin), teknolojiler, sonuç,
+    bağlantılar.
+- **Kullanıcılar (`/kullanicilar`):** kullanıcı listesi + role atama
+  formu. **Bilinen API kısıtı:** `GET /users` bir kullanıcının mevcut
+  rollerini döndürmüyor (yalnızca `/users/me` kendi rollerini görüyor) —
+  admin sayfası bunu UI'da açıkça belirtiyor, API'yi genişletmeden.
+- **Roller (`/roller`):** rol oluşturma + role izin ekleme. Aynı kısıt:
+  `GET /roles` bir rolün mevcut izinlerini döndürmüyor.
+- **Ayarlar (`/ayarlar`):** general/seo/social, kategori başına ayrı
+  `PATCH` (madde 15'in "kategori bazlı GET/PATCH"ı).
+- **Menü (`/menu`):** tam CRUD — oluştur/düzenle/sil, `isVisible`/`position`.
+- **Kapsam dışı bırakılanlar:** dark mode. Bunun dışında master prompt'un
+  admin kapsamındaki her domain artık bir arayüze sahip.
 
 **Bulunan ve düzeltilen bug (test script'i, uygulama değil):** İçerik
 oluşturma formunu Playwright ile uçtan uca test ederken, form submit

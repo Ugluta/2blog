@@ -4,15 +4,7 @@ import { canTransitionContent } from "@2blog/core-content-engine";
 import { apiFetch, ApiError } from "../../../../lib/api";
 import ContentForm from "../ContentForm";
 import { updateContentAction, transitionContentAction, deleteContentAction } from "../actions";
-
-const STATUS_ACTION_LABELS: Record<string, string> = {
-  DRAFT: "Taslağa al",
-  REVIEW: "İncelemeye gönder",
-  APPROVED: "Onayla",
-  SCHEDULED: "Zamanla",
-  PUBLISHED: "Yayınla",
-  ARCHIVED: "Arşivle",
-};
+import ContentStatusBar from "../../../../components/ContentStatusBar";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -30,30 +22,18 @@ export default async function EditContentPage({ params }: Props) {
   }
 
   const boundUpdate = updateContentAction.bind(null, id);
-  const boundDelete = deleteContentAction.bind(null, id);
   const nextStatuses = CONTENT_STATUSES.filter((status) => canTransitionContent(content.status, status));
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">{content.title}</h1>
-        <form action={boundDelete}>
-          <button type="submit" className="text-sm text-danger hover:underline">
-            Sil
-          </button>
-        </form>
-      </div>
+      <h1 className="mb-6 text-2xl font-bold">{content.title}</h1>
 
-      <div className="mb-8 flex flex-wrap items-center gap-2">
-        <span className="text-sm text-foreground/60">Durum: {content.status}</span>
-        {nextStatuses.map((status) => (
-          <form key={status} action={transitionContentAction.bind(null, id, status)}>
-            <button type="submit" className="rounded-md border border-border px-3 py-1.5 text-sm hover:border-primary">
-              {STATUS_ACTION_LABELS[status] ?? status}
-            </button>
-          </form>
-        ))}
-      </div>
+      <ContentStatusBar
+        status={content.status}
+        nextStatuses={nextStatuses}
+        transitionAction={transitionContentAction.bind(null, id)}
+        deleteAction={deleteContentAction.bind(null, id)}
+      />
 
       <ContentForm action={boundUpdate} initial={content} submitLabel="Kaydet" />
     </div>

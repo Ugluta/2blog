@@ -9,7 +9,14 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Panel" },
   { href: "/icerik", label: "İçerik", requiredPermission: "CONTENT_VIEW" },
+  { href: "/projelerimiz", label: "Projelerimiz", requiredPermission: "CONTENT_VIEW" },
+  { href: "/hizmetler", label: "Hizmetler", requiredPermission: "CONTENT_VIEW" },
+  { href: "/yaptiklarimiz", label: "Yaptıklarımız", requiredPermission: "CONTENT_VIEW" },
   { href: "/medya", label: "Medya", requiredPermission: "MEDIA_VIEW" },
+  { href: "/kullanicilar", label: "Kullanıcılar", requiredPermission: "USER_VIEW" },
+  { href: "/roller", label: "Roller", requiredPermission: "ROLE_VIEW" },
+  { href: "/ayarlar", label: "Ayarlar", requiredPermission: "SETTINGS_MANAGE" },
+  { href: "/menu", label: "Menü", requiredPermission: "SETTINGS_MANAGE" },
 ];
 
 /**

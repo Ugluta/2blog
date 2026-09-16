@@ -440,3 +440,75 @@ geçti.
 
 **Kapsam dışı bırakılanlar (sonraki fazlar):** Projects/Services/Works
 admin UI, Users/Roles admin UI, Settings/Menü admin UI, dark mode.
+
+## Admin Panel — Projelerimiz/Hizmetler/Yaptıklarımız/Kullanıcılar/Roller/Ayarlar/Menü (tamamlandı)
+
+Önceki fazda bilinçli olarak ertelenen admin arayüzlerinin tamamı yazıldı.
+Hepsi mevcut Core API uçlarını `lib/api.ts` üzerinden çağırıyor — DB'ye
+doğrudan bağlanan yok, yeni bir API endpoint'i açılmadı (bu faz saf admin
+UI fazı).
+
+**Paylaşılan component'ler** (İçerik'in kendi ContentForm'una dokunmadan,
+üç yeni domain arasında tekrarı önlemek için): `ContentBaseFields.tsx`
+(title/slug/excerpt/body/coverImage/SEO fieldset — Content Engine'in
+ortak alanları), `ContentStatusBar.tsx` (durum + geçiş butonları + sil),
+`lib/content-status-labels.ts` (Türkçe durum etiketleri). İçerik'in
+`[id]/page.tsx`'i de bu paylaşılan component'leri kullanacak şekilde
+düşük riskli bir DRY refactor'ü aldı (davranış aynı, `test3.js` ile
+regresyon olmadığı doğrulandı).
+
+**Projelerimiz/Hizmetler/Yaptıklarımız:** İçerik'teki CRUD+workflow
+deseninin birebir aynısı, her biri kendi domain-özel alanlarıyla
+(`packages/validation`'daki create/update şemalarına birebir uyacak
+şekilde). Hizmetler'in kategori seçimi için `/hizmetler` sayfasına inline
+bir "kategori ekle" formu eklendi (API'de kategori update/delete uç noktası
+yok — yalnızca list+create var, admin UI da bununla sınırlı).
+
+**Kullanıcılar/Roller:** `GET /users` ve `GET /roles` uçları sırasıyla
+kullanıcının mevcut rollerini ve rolün mevcut izinlerini döndürmüyor
+(yalnızca atama/ekleme uçları var, "mevcut durumu listele" yok) — bu API
+tarafının önceki bir fazdan kalma bilinen bir kısıtı; admin sayfaları bunu
+kullanıcıya açıkça not olarak gösteriyor, API'yi bu faz kapsamında
+genişletmedim (kapsam: admin UI, API değil).
+
+**Ayarlar/Menü:** Ayarlar üç kategori (general/seo/social) için ayrı
+`PATCH` formu; Menü tam CRUD (oluştur/düzenle/sil), `Sil` butonu aynı
+`<form>` içinde `formAction` override'ıyla (ikinci bir nested form
+gerektirmeden).
+
+**Bulunan ve düzeltilen bug'lar (bu kez ikisi de test script'inde, ilki
+önceki fazdakiyle aynı sınıftan):**
+1. API'yi s3rver'a karşı başlatırken tekrar `NotImplemented` hatası
+   (`PutBucketPolicyCommand`, s3rver'ın desteklemediği) çıktı çünkü bu
+   oturumun taze container'ında `packages/core-media`'nın `dist/` build
+   çıktısı, önceki fazın test bypass'ının geri alınmasından SONRAKİ
+   kaynak durumuyla senkronize değildi — bypass'ı test için tekrar
+   eklerken `pnpm --filter @2blog/core-media build` çalıştırmayı atlamıştım,
+   NestJS `@2blog/core-media`'yı `dist/`'ten import ettiği için kaynak
+   değişikliği hiç etkili olmadı. Paket build edilince düzeldi. Test
+   bitince bypass tekrar geri alındı VE paket tekrar build edildi (dist'in
+   commit edilen kaynakla senkron kalması için).
+2. Menü CRUD testinde `page.locator("form", { has: page.locator('input[value=X]') })`
+   deseni kullanıldı; düzenleme formunda önce input'un value'sunu
+   `fill()` ile değiştirip SONRA aynı `has:` filtresine dayanan locator'ı
+   tekrar sorgulayınca (`.locator(...).click()`), filtre artık DOM'da
+   eşleşmiyordu (çünkü input'un value'su X değil artık) — locator
+   canlı/lazy değerlendirildiği için. Düzeltme: `elementHandle()` ile
+   formun sabit bir DOM referansını alıp sonraki tüm etkileşimleri o
+   handle üzerinden yapmak (fill + Kaydet/Sil butonlarını
+   `:not([formaction])` / `[formaction]` ile ayırt ederek). Uygulama
+   kodunda hiçbir değişiklik gerekmedi.
+
+**Doğrulama (gerçek PostgreSQL + Redis + s3rver'a karşı, Docker olmadan,
+gerçek Chromium/Playwright ile uçtan uca):** proje oluştur → yayınla →
+düzenle → listede doğrula → sil → listeden kalktığını doğrula (aynı akış
+hizmet için — önce kategori oluşturup hizmete atayarak — ve iş için de
+tekrarlandı) → rol oluştur → role izin ekle (hatasız) → kullanıcıya rol
+ata (hatasız) → genel ayarları güncelle → sayfa yenilenince kalıcı
+olduğunu doğrula → menü öğesi oluştur → düzenle → sil, her adımda
+doğrulama. Ayrıca önceki fazın İçerik/Medya testi (`test3.js`) regresyon
+kontrolü için tekrar çalıştırıldı ve geçti.
+
+**Kapsam dışı bırakılanlar:** dark mode. Bunun dışında master prompt'un
+admin panelindeki her domain artık bir arayüze sahip; sıradaki mantıklı
+adım farklı bir faz (Scraper/AI/Social/Analytics/SEO).
