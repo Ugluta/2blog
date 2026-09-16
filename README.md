@@ -14,9 +14,26 @@ apps/
 
 packages/
   config/          env şeması + design tokens
-  types/            paylaşılan TS tipleri
-  validation/         zod şemaları
-  core-database/        Drizzle schema + client (PostgreSQL)
+  types/            paylaşılan TS tipleri (API zarfı, Core identity)
+  validation/         zod şemaları (auth, rbac, ortak)
+  core-database/        Drizzle schema + client (PostgreSQL) + seed script
+  core-auth/              argon2id, access/refresh token, rotation yardımcıları
+  core-rbac/                hasPermission() + Core izin registry'si
+```
+
+## Auth & RBAC (PHASE 3)
+
+- `POST /api/v1/auth/login|refresh|logout` — refresh token rotation + reuse
+  detection (bkz. `docs/ARCHITECTURE.md` madde 8). Public registration
+  endpoint'i yok; ilk admin kullanıcı seed script ile oluşturulur.
+- `GET /api/v1/users/me` — geçerli access token yeterli.
+- `GET/POST /api/v1/roles`, `POST /api/v1/roles/:id/permissions`,
+  `GET /api/v1/permissions`, `POST /api/v1/users/:id/roles` — `ROLE_VIEW` /
+  `ROLE_MANAGE` / `USER_VIEW` / `USER_MANAGE` izinleriyle korunur.
+
+```bash
+pnpm db:migrate  # şemayı uygula
+SEED_ADMIN_EMAIL=admin@example.com SEED_ADMIN_PASSWORD=... pnpm db:seed
 ```
 
 ## Gereksinimler
@@ -52,6 +69,7 @@ pnpm typecheck   # tüm workspace
 pnpm lint        # tüm workspace
 pnpm db:generate # Drizzle migration dosyası üret (packages/core-database)
 pnpm db:migrate  # migration'ları uygula
+pnpm db:seed     # Core izinleri + SUPER_ADMIN rolü + (opsiyonel) ilk admin kullanıcı
 ```
 
 ## Production Deployment

@@ -14,16 +14,20 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
     "generate": "drizzle-kit generate",
-    "migrate": "drizzle-kit migrate"
+    "migrate": "drizzle-kit migrate",
+    "seed": "tsx src/seed.ts"
   },
   "dependencies": {
     "@2blog/config": "workspace:*",
+    "@2blog/core-auth": "workspace:*",
+    "@2blog/core-rbac": "workspace:*",
     "drizzle-orm": "^0.38.3",
     "postgres": "^3.4.5"
   },
   "devDependencies": {
     "@types/node": "^22.20.3",
     "drizzle-kit": "^0.30.1",
+    "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   }
 }

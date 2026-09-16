@@ -28,3 +28,15 @@ export interface AuthenticatedUser extends User {
   roles: Role[];
   permissions: string[];
 }
+
+/**
+ * Shape embedded in the access token (ARCHITECTURE.md madde 8) — kept
+ * intentionally small; the token is short-lived so roles/permissions are
+ * baked in at issuance rather than re-fetched from the DB per request.
+ */
+export interface AccessTokenPayload {
+  sub: string;
+  email: string;
+  roles: string[];
+  permissions: string[];
+}
