@@ -17,6 +17,7 @@ export const CORE_PERMISSIONS = [
   { key: "MEDIA_UPLOAD", label: "Medya yükle" },
   { key: "MEDIA_EDIT", label: "Medya metadata düzenle (alt text, caption)" },
   { key: "MEDIA_DELETE", label: "Medya sil" },
+  { key: "SETTINGS_MANAGE", label: "Sistem ayarlarını ve site navigasyonunu yönet" },
 ] as const;
 
 export type CorePermissionKey = (typeof CORE_PERMISSIONS)[number]["key"];

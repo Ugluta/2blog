@@ -58,6 +58,15 @@ async function main() {
     console.log("SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD not set — skipping admin user bootstrap");
   }
 
+  const defaultSettings: Record<string, Record<string, unknown>> = {
+    general: { siteName: "2blog" },
+    seo: { robotsIndexable: true },
+    social: {},
+  };
+  for (const [category, values] of Object.entries(defaultSettings)) {
+    await db.insert(schema.settings).values({ category, values }).onConflictDoNothing({ target: schema.settings.category });
+  }
+
   console.log("Seed complete");
   process.exit(0);
 }

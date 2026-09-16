@@ -257,3 +257,58 @@ kanıtlamak olan bu fazın kapsamı dışında bırakıldı.
 (`ContentMedia` join tablosu, Media modülü artık hazır ama bu faz kapsamında
 değildi), Services'in `process` alanının yapılandırılmış adım listesi yerine
 düz string[] olması, apps/web'in bu endpoint'leri gerçekten render etmesi.
+
+## PHASE 4 — System Settings & Menü (tamamlandı)
+
+**Yeni core-database tabloları:** `settings` (`category` PK — general/seo/social,
+`values` jsonb, `updatedBy` FK users SET NULL), `menu_items` (düz liste,
+kasıtlı olarak parent/child nesting yok — public site nav'ı için gerekli
+değil, admin sidebar'ın kendi accordion mantığı ayrı bir konu).
+
+**apps/api'ye eklenen (`core/settings/`):** `SettingsService`/`SettingsController`
+(`GET /settings`, `GET /settings/:category` **guard'sız** — burada tutulan
+hiçbir şey hassas değil; `PATCH /settings/:category` `SETTINGS_MANAGE` ister
+ve stored değerin üstüne **merge** eder, replace etmez). Kategoriye özel zod
+şemaları (`SETTINGS_SCHEMAS`/`UPDATE_SETTINGS_SCHEMAS`) `:category` param'ına
+göre elle seçiliyor çünkü Nest'in `@Body()` pipe'ı decore-time'da sabit,
+route çalışırken dinamik şema seçemiyor. `MenuService`/`MenuController`
+(admin, `SETTINGS_MANAGE`) + `MenuPublicController` (guard'sız, yalnızca
+`isVisible` öğeler) — `/content/public` ile aynı ayrık-controller deseni.
+
+**Bulunan ve düzeltilen gerçek bug (kod üretimi sırasında, teste bile
+girmeden yakalandı):** `MenuController`'ı ilk yazışta `@RequirePermission`'ı
+controller sınıfının üstüne koymuştum. `PermissionsGuard` yalnızca
+`context.getHandler()`'dan (metod seviyesi) metadata okuyor —
+`context.getClass()` değil — yani class-level `@RequirePermission` **sessizce
+hiç okunmuyor** ve `required` her zaman `undefined` kalıyor, bu da guard'ın
+`if (!required) return true` yoluyla **tüm route'ları izin kontrolsüz
+bırakması** demek. Codebase'deki her diğer controller (`RolesController`,
+`ContentController`, `MediaController`...) zaten doğru şekilde metod
+seviyesinde kullanıyordu; sadece bu yeni dosyada atladım. Test etmeden önce
+fark edip metod seviyesine taşıdım, sonra testte MEMBER rolüyle `GET /menu`
+denemesi gerçekten 403 döndürerek düzeltmeyi doğruladı.
+
+**Seed script'e eklenen:** `general`/`seo`/`social` için varsayılan `settings`
+satırları (idempotent, `onConflictDoNothing`).
+
+**Doğrulama (gerçek PostgreSQL + Redis'e karşı, Docker olmadan):**
+- Migration uygulandı (2 yeni tablo), seed varsayılan settings satırlarını
+  oluşturdu — `GET /settings` seed'lenmiş `{general:{siteName:"2blog"},
+  seo:{robotsIndexable:true}, social:{}}` döndürdü
+- Bilinmeyen kategori (`/settings/bogus`) → 400; auth'suz PATCH → 401
+- PATCH merge semantiği doğrulandı: önce `siteName`+`contactEmail` set edildi,
+  sonra sadece `siteDescription` gönderildi → önceki iki alan korundu
+- Geçersiz email formatı → 400 (kategoriye özel zod şeması çalışıyor)
+- Menü: görünür + gizli (`isVisible:false`) öğeler oluşturdum → `/menu/public`
+  sadece görünürleri döndürdü, admin `/menu` ikisini de döndürdü
+- **Yukarıdaki bug fix'in canlı doğrulaması:** MEMBER rolüyle hem `POST /menu`
+  hem `GET /menu` → ikisi de 403 (fix olmasaydı `GET /menu` yanlışlıkla 200
+  dönecekti)
+- Menü update/delete + var olmayan id'yi silme → 404, hepsi doğrulandı
+
+**Kapsam dışı bırakılanlar (sonraki fazlar):** Menüde nested/parent-child
+yapı (self-referencing FK — gerçek ihtiyaç doğduğunda eklenecek), settings
+kategorilerinin admin panelden gerçekten düzenlenmesi (apps/admin hâlâ
+placeholder), `social` kategorisinin gerçek OAuth token'ları tutması
+(PHASE 14'te ayrı, encrypted bir `social_accounts` tablosunda olacak — bu
+genel `settings` blob'una asla girmeyecek).

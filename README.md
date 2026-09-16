@@ -101,6 +101,20 @@ yazabileceği bir `onCreated`/`onUpdated` callback kabul ediyor — Core hâlâ
 - Works kasıtlı olarak daha gevşek: `category` düz bir string, ayrı bir
   tablo yok (master prompt madde 6: "aynı veri modeli olmak zorunda değil").
 
+## System Settings & Menü
+
+- `GET /api/v1/settings`, `GET /api/v1/settings/:category` — **herkese açık**
+  (site adı, SEO varsayılanları, sosyal linkler — hiçbiri hassas değil, `apps/web`
+  SSR'da unauthenticated çağırır). `PATCH /api/v1/settings/:category`
+  `SETTINGS_MANAGE` ister ve **merge** eder (replace değil — sadece gönderilen
+  alanlar güncellenir). Kategori başına ayrı zod şeması (`general`/`seo`/`social`);
+  bilinmeyen kategori 400 döner.
+- `GET /api/v1/menu/public` — herkese açık, yalnızca `isVisible=true` öğeler,
+  `position`'a göre sıralı (master prompt madde 3: "Menüler hard-coded
+  olmayacak"). `GET/POST/PATCH/DELETE /api/v1/menu` — admin, `SETTINGS_MANAGE`.
+- Seed script varsayılan `general`/`seo`/`social` satırlarını da idempotent
+  şekilde oluşturur.
+
 ## Gereksinimler
 
 - Node.js ≥ 20
