@@ -374,3 +374,69 @@ sayfalar yapıldı.
 İletişim sayfaları (ilgili content type'lar/backend hazır olunca), dark
 mode, sitemap.xml/robots.txt/JSON-LD (PHASE 10-11), galeri/video desteği
 (Media modülü hazır ama `ContentMedia` join tablosu yok).
+
+## Admin Panel — Auth/Layout/Dashboard/İçerik/Medya (tamamlandı)
+
+**apps/admin artık gerçek bir yönetim paneli** (önceki fazlarda placeholder'dı).
+Kapsam bilinçli olarak temel tutuldu: Auth, Layout, Dashboard, İçerik
+(post CRUD + publish workflow), Medya. Projects/Services/Works admin UI,
+Users/Roles admin UI, Settings/Menü admin UI **bilinçli olarak ertelendi**
+(fast-follow) — Core API tarafları zaten var (önceki fazlarda yazıldı),
+sadece admin arayüzleri yok.
+
+**Auth:** `apps/web`'den farklı olarak apps/admin token'ları hiç client
+JS'e açmıyor — httpOnly cookie + `middleware.ts`'te sessiz refresh
+(madde: access token yoksa refresh token'la `POST /auth/refresh` deneniyor,
+o da başarısızsa `/login`'e redirect). Login Server Action
+(`@2blog/validation`'ın `loginSchema`'sıyla doğrulanıyor) → cookie set →
+redirect. `(admin)/layout.tsx` her sayfa için `GET /users/me`'yi çağırıp
+kullanıcı+izinleri alıyor; `UnauthenticatedError` → `/login`. Sidebar
+izinlere göre menüyü filtreliyor ama bu **sadece UX** — gerçek sınır
+her zaman API'nin `PermissionsGuard`'ı.
+
+**İçerik:** liste/oluştur/düzenle/sil + workflow geçiş butonları
+(`@2blog/core-content-engine`'in `canTransitionContent`'i import edilerek
+kullanıldı — workflow grafiğinin admin tarafında ikinci bir kopyasını
+yazmak yerine, madde 24). Create/update aynı `ContentForm` client
+component'ini paylaşıyor (`useActionState`).
+
+**Medya:** multipart upload (`apiFetchForm`) + silme, grid'de görsel
+önizleme.
+
+**Bulunan ve düzeltilen bug — test script'inde, uygulama kodunda değil:**
+İçerik oluşturma formunu Playwright ile uçtan uca test ederken, submit
+sonrası tarayıcı `/icerik/<yeni-id>` yerine `/login`'e düşüyordu ve DB'de
+yeni satır oluşmuyordu. `createPostAction`'ın içine eklenen debug log'lar
+fonksiyonun **hiç çağrılmadığını** gösterdi; middleware'in geçerli bir
+access token gördüğünü ve `apiFetch`'in hiç tetiklenmediğini de doğruladım
+— yani sorun uygulama mantığından önce, framework/routing seviyesindeydi
+gibi görünüyordu. Playwright'ın `request`/`response` event'lerini dinleyip
+gerçek POST'un header'larını yakaladım: `next-action` header'ındaki action
+ID'yi `.next/server/server-reference-manifest.json`'da elle çözünce, bu
+ID'nin `createPostAction`'a değil **`logoutAction`'a** ait olduğu ortaya
+çıktı. Kök neden: test script'i `page.click('button[type="submit"]')` gibi
+sayfa genelinde generic bir selector kullanıyordu; `(admin)/layout.tsx`
+her admin sayfasında Topbar'ı (kendi `<form action={logoutAction}>`'ıyla)
+`<main>`'den **önce** render ediyor, yani DOM'da önce Topbar'ın "Çıkış
+yap" butonu geliyor. Playwright generic selector'la ilk eşleşen submit
+butonunu (çıkış butonunu) tıklıyordu — her "içerik oluştur" denemesi
+aslında kullanıcıyı çıkış yaptırıp `/login`'e atıyordu, tam gözlemlenen
+davranışın nedeni. Uygulama kodunda **hiçbir değişiklik gerekmedi**;
+düzeltme yalnızca test script'lerinde her forma özgü selector kullanmaktı
+(`form:has(#title) button[type="submit"]`, `:has-text("Yayınla")` gibi).
+Bu araştırma sürecinde ayrıca (yanlış bir ipucu olarak) `.next` build
+cache'inin bir önceki oturumdan kalma stale state taşıyabileceği
+ihtimalini de elendi (`rm -rf .next` ile tam temiz rebuild yapıp aynı
+sonucu aldım) — gerçek kök neden yukarıdaki selector çakışmasıydı.
+
+**Doğrulama (gerçek PostgreSQL + Redis + s3rver'a karşı, Docker olmadan,
+gerçek Chromium/Playwright ile uçtan uca):** login → içerik oluştur →
+yayınla (DRAFT→PUBLISHED transition) → başlığı düzenle+kaydet → listede
+göründüğünü doğrula → medya yükle → medya sayfasında göründüğünü doğrula
+→ medyayı sil → içeriği sil → listeden kalktığını doğrula → çıkış yap →
+`/login`'e düştüğünü doğrula → `/`'ye tekrar gidince yine `/login`'e
+düştüğünü doğrula (post-logout guard). Hepsi tek bir script'te uçtan uca
+geçti.
+
+**Kapsam dışı bırakılanlar (sonraki fazlar):** Projects/Services/Works
+admin UI, Users/Roles admin UI, Settings/Menü admin UI, dark mode.

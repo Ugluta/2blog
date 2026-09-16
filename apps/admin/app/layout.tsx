@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
+import "./globals.css";
 
 export const metadata = {
-  title: "2blog Admin",
+  title: { default: "2blog Admin", template: "%s — 2blog Admin" },
   description: "Core Platform — admin panel",
 };
 

@@ -139,6 +139,51 @@ alıyor (madde 24) — ikinci bir palet kopyası açmak yerine.
   kurulmadı; var olmayan bir şeyi render eden sayfa yazmak yerine, backend'i
   olan dört tür (post/project/service/work) için gerçek sayfalar yapıldı.
 
+## Admin (apps/admin)
+
+`apps/admin` — Auth, İçerik ve Medya yönetimi için temel bir yönetim
+paneli. `apps/web` gibi hiçbir zaman DB'ye doğrudan bağlanmıyor, her şey
+`lib/api.ts` üzerinden Core API'yi çağırıyor (madde 2/3).
+
+- **Auth:** httpOnly cookie'lerde tutulan access/refresh token çifti
+  (asla localStorage/client JS'e açık değil). `middleware.ts` her admin
+  sayfasından önce çalışıp access token'ı kontrol ediyor; yoksa refresh
+  token'la sessiz bir `POST /auth/refresh` deneyip cookie'leri yeniliyor,
+  refresh de başarısızsa `/login`'e yönlendiriyor.
+- **Layout/Dashboard:** `(admin)/layout.tsx` `GET /users/me`'yi çağırıp
+  giriş yapmış kullanıcıyı ve izinlerini alıyor; Sidebar bu izinlere göre
+  menü öğelerini gizliyor — **bu sadece UX**, gerçek güvenlik sınırı her
+  zaman API'nin `PermissionsGuard`'ı (madde ~ RBAC fazı).
+- **İçerik (`/icerik`):** `post` tipi içerikler için CRUD + workflow.
+  Oluşturma/düzenleme formu (`ContentForm`) `useActionState` ile Server
+  Action'lara bağlı; durum geçişleri (`canTransitionContent`,
+  `@2blog/core-content-engine`'den import edilerek workflow grafiğinin
+  admin tarafında tekrar yazılması önlendi) buton olarak render oluyor.
+- **Medya (`/medya`):** dosya yükleme (`apiFetchForm`, multipart) ve
+  silme; grid'de görsellerin gerçek önizlemesi, diğer türler için kind
+  etiketi.
+- **Kapsam dışı bırakılanlar (sonraki fazlar):** Projects/Services/Works
+  admin UI, Users/Roles admin UI, Settings/Menü admin UI, dark mode —
+  hepsi API tarafında zaten var, sadece admin arayüzü yazılmadı.
+
+**Bulunan ve düzeltilen bug (test script'i, uygulama değil):** İçerik
+oluşturma formunu Playwright ile uçtan uca test ederken, form submit
+edildiğinde `createPostAction` hiç çalışmadan `/login`'e yönlendiği
+görüldü. Kök neden araştırması (`Next-Action` header'ını ve action ID'yi
+`server-reference-manifest.json`'da manuel çözerek) gösterdi ki: tıklanan
+buton **content formunun değil, Topbar'daki çıkış yap formunun** submit
+butonuydu — çünkü test script'i `button[type="submit"]` gibi sayfa
+genelinde birden fazla eşleşen, spesifik olmayan bir selector kullanıyordu
+ve Topbar (çıkış formu içeren) DOM'da content formundan önce render
+oluyor. Playwright'ın generic selector'ı ilk eşleşeni (çıkış butonunu)
+tıklıyordu — bu yüzden her "içerik oluştur" denemesi aslında kullanıcıyı
+çıkış yaptırıyordu. Uygulama kodunda hiçbir değişiklik gerekmedi; düzeltme
+test script'lerinin her forma özgü, benzersiz selector'lar kullanmasıydı
+(ör. `form:has(#title) button[type="submit"]`, metne göre
+`:has-text("Yayınla")`). Bu, birden fazla `<form>`/submit butonu render
+eden layout'larda genel/generic selector kullanmanın tehlikesine dair
+somut bir hatırlatma.
+
 ## Gereksinimler
 
 - Node.js ≥ 20
