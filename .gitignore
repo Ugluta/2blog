@@ -14,6 +14,7 @@ coverage/
 
 .DS_Store
 *.log
+dump.rdb
 npm-debug.log*
 pnpm-debug.log*
 

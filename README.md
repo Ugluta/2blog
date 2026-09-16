@@ -8,9 +8,9 @@ Mimari kararlar ve gerekçeleri için bkz. [`docs/ARCHITECTURE.md`](./docs/ARCHI
 ```
 apps/
   web/      Next.js — public site (Blog/Hizmetler/Projelerimiz/Yaptıklarımız, Tailwind)
-  admin/    Next.js — admin panel (UI, business logic yok, hâlâ placeholder)
+  admin/    Next.js — admin panel (UI, business logic yok)
   api/      NestJS — tüm business logic, RBAC, validation, audit
-  worker/   BullMQ worker — scraper/AI/media/social/email job'ları
+  worker/   BullMQ worker — scraper job'ları çalışıyor; AI/media/social/email henüz yok
 
 packages/
   config/          env şeması + design tokens
@@ -21,6 +21,7 @@ packages/
   core-rbac/                hasPermission() + Core izin registry'si
   core-content-engine/        content workflow state machine + type registry
   core-media/                   StorageProvider abstraction (S3/MinIO), mime sniffing
+  core-scraper-kit/               HTTP fetch+retry, robots.txt, SSRF guard, rate limiter, HTML extraction
 ```
 
 ## Auth & RBAC (PHASE 3)
@@ -100,6 +101,61 @@ yazabileceği bir `onCreated`/`onUpdated` callback kabul ediyor — Core hâlâ
   opsiyonel bir `restrictToIds` parametresi kabul ediyor.
 - Works kasıtlı olarak daha gevşek: `category` düz bir string, ayrı bir
   tablo yok (master prompt madde 6: "aynı veri modeli olmak zorunda değil").
+
+## Scraper / Data Pool
+
+`docs/ARCHITECTURE.md` madde 10'un Core/Domain ayrımının gerçek örneği:
+mekanizma (`packages/core-scraper-kit`) generic ve domain'siz, hangi
+sitelerin tarandığı/nasıl parse edildiği (`apps/api/src/blog/scraper`)
+tamamen Blog domain'inin bilgisi.
+
+```
+SOURCE → CRAWL → RAW DATA → EXTRACTION → NORMALIZATION → CLASSIFICATION
+       → DUPLICATE CHECK → REVIEW → APPROVAL → PUBLISH
+```
+
+- **`packages/core-scraper-kit`** (Core, DB tablosu yok — saf mekanizma):
+  `fetchHtml` (SSRF guard'lı + timeout/retry'lı fetch), `isAllowedByRobots`
+  (hand-rolled minimal robots.txt parser), `RateLimiter` (Redis tabanlı,
+  domain başına sabit-pencere sayaç), `extractText/extractAttr/extractLinks`
+  (cheerio), `computeContentHash` (dedup anahtarı). **SSRF guard**
+  (`assertPublicHttpUrl`) DNS çözümleyip *çözümlenen* adresi private/
+  loopback/link-local aralıklarına karşı kontrol ediyor — sadece hostname
+  string'ine bakmak DNS rebinding'e açık olurdu.
+- **`apps/api/src/blog/scraper`** (Domain): `scraper_sources` (hedef site +
+  liste sayfası + liste öğesi selector'ı), `scraper_rules` (başlık/içerik/
+  özet/kapak selector'ları — bir source birden fazla rule'a sahip olabilir,
+  site tasarımı değişince eskisi crawl geçmişiyle birlikte kalır),
+  `crawl_jobs` (her tarama çalıştırmasının audit kaydı — API sadece PENDING
+  satırı yaratıp BullMQ `scraper` kuyruğuna atıyor, RUNNING/SUCCESS/FAILED
+  geçişleri worker'da), `raw_data_items` (`contentHash` **unique** — ikinci
+  bir crawl'ın veya başka bir kaynakta yayınlanmış aynı içeriğin
+  `onConflictDoNothing` ile sessizce elenmesi, bu *DUPLICATE* durumunun ta
+  kendisi), `data_pool_items` (RAW hiç persist edilmiyor — extraction
+  crawl sırasında senkron olduğu için bir satır doğrudan PROCESSED olarak
+  doğuyor; REVIEW admin aksiyonu: onayla→READY / reddet→REJECTED; PUBLISH
+  gerçek `contents` satırını `ContentService.create` ile yaratıp
+  `contentId`'yi set ediyor).
+- **apps/worker**: ilk gerçek BullMQ processor'ü (`processors/scraper.
+  processor.ts`) — crawl job'ı alır, listeyi çeker, her öğe linkini SSRF
+  guard + robots.txt + rate limit kontrolünden geçirip çeker, extract eder,
+  `raw_data_items`'a dedup'lu insert eder, yeni olan her satır için
+  `data_pool_items` yaratır. Tek bir crawl'da en fazla 20 öğe (bilinçli
+  sınır) — hız/zaman aşımı riskini sınırlamak için.
+- `/scraper/sources`, `/scraper/rules`, `/scraper/jobs`,
+  `/scraper/data-pool` — master prompt madde 15'teki uç noktalarla birebir.
+  Yeni izinler: `SCRAPER_MANAGE` (source/rule/job), `DATA_POOL_MANAGE`
+  (incele/onayla/reddet/yayınla).
+- **admin (`/scraper`, `/veri-havuzu`)**: kaynak+kural yönetimi, "Şimdi
+  tara" butonu, tarama geçmişi tablosu; Data Pool listesi (durum filtreli)
+  ve her öğe için onayla/reddet/yayınla (slug girişiyle) akışı.
+- **Bilinçli kapsam kararları:** `scraper_sources.scheduleCron` alanı var
+  ama bu fazda hiçbir şey onu okumuyor — taramalar admin panelinden elle
+  tetikleniyor (gerçek bir cron/repeatable-job scheduler sonraki faz).
+  Publish yalnızca `typeKey: "post"` üretiyor — Project/Service/Work'ün
+  kendi zorunlu alanları (teknolojiler, kategori, ...) taranan ham veride
+  doğal olarak yok, var olmayan alanlara sahte değer uydurmak yerine bu
+  akış post'la sınırlı tutuldu.
 
 ## System Settings & Menü
 

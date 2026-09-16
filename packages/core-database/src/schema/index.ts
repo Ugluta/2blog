@@ -17,3 +17,8 @@ export * from "./service-details";
 export * from "./work-details";
 export * from "./settings";
 export * from "./menu-items";
+export * from "./scraper-sources";
+export * from "./scraper-rules";
+export * from "./crawl-jobs";
+export * from "./raw-data-items";
+export * from "./data-pool-items";

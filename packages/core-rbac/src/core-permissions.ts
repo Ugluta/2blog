@@ -18,6 +18,8 @@ export const CORE_PERMISSIONS = [
   { key: "MEDIA_EDIT", label: "Medya metadata düzenle (alt text, caption)" },
   { key: "MEDIA_DELETE", label: "Medya sil" },
   { key: "SETTINGS_MANAGE", label: "Sistem ayarlarını ve site navigasyonunu yönet" },
+  { key: "SCRAPER_MANAGE", label: "Scraper kaynaklarını/kurallarını yönet, tarama başlat" },
+  { key: "DATA_POOL_MANAGE", label: "Data Pool öğelerini incele, onayla/reddet, yayınla" },
 ] as const;
 
 export type CorePermissionKey = (typeof CORE_PERMISSIONS)[number]["key"];

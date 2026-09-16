@@ -5,6 +5,7 @@ import { CONTENT_TYPE_REGISTRY } from "../core/content/content-type-registry.con
 import { ProjectsModule } from "./projects/projects.module";
 import { ServicesModule } from "./services/services.module";
 import { WorksModule } from "./works/works.module";
+import { ScraperModule } from "./scraper/scraper.module";
 
 /**
  * Blog is Core's first domain module, not a special case Core knows about
@@ -20,7 +21,7 @@ import { WorksModule } from "./works/works.module";
  * project`) recognize it instead of 400ing as unknown.
  */
 @Module({
-  imports: [ProjectsModule, ServicesModule, WorksModule],
+  imports: [ProjectsModule, ServicesModule, WorksModule, ScraperModule],
 })
 export class BlogModule implements OnModuleInit {
   constructor(@Inject(CONTENT_TYPE_REGISTRY) private readonly registry: ContentTypeRegistry) {}

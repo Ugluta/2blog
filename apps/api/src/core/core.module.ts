@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { HealthModule } from "./health/health.module";
 import { DatabaseModule } from "./database/database.module";
+import { CacheModule } from "./cache/cache.module";
 import { AuthModule } from "./auth/auth.module";
 import { RbacModule } from "./rbac/rbac.module";
 import { UsersModule } from "./users/users.module";
@@ -16,6 +17,6 @@ import { SettingsModule } from "./settings/settings.module";
  * ContentTypeRegistry, never concrete types like "post" or "document".
  */
 @Module({
-  imports: [DatabaseModule, HealthModule, AuthModule, RbacModule, UsersModule, ContentModule, MediaModule, SettingsModule],
+  imports: [DatabaseModule, CacheModule, HealthModule, AuthModule, RbacModule, UsersModule, ContentModule, MediaModule, SettingsModule],
 })
 export class CoreModule {}

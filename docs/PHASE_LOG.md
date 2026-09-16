@@ -512,3 +512,104 @@ kontrolü için tekrar çalıştırıldı ve geçti.
 **Kapsam dışı bırakılanlar:** dark mode. Bunun dışında master prompt'un
 admin panelindeki her domain artık bir arayüze sahip; sıradaki mantıklı
 adım farklı bir faz (Scraper/AI/Social/Analytics/SEO).
+
+## Scraper / Data Pool (tamamlandı)
+
+Master prompt'un Scraper fazı — `docs/ARCHITECTURE.md` madde 10'un
+Core/Domain ayrımı ilk kez gerçek koda döküldü, ve `apps/worker` ilk defa
+gerçek bir BullMQ processor kazandı (önceki fazlardan beri "no queues
+registered yet" placeholder'dı).
+
+**Core: `packages/core-scraper-kit`** (yeni paket, DB tablosu yok — saf
+mekanizma, madde 10'un "CORE (packages/core-scraper-kit)" listesiyle
+birebir): `fetchHtml` (SSRF guard'lı, timeout+exponential-backoff retry'lı
+fetch), `isAllowedByRobots` (hand-rolled minimal robots.txt parser —
+Media'nın magic-byte sniffing'i gibi küçük, tam sahip olunan bir parsing
+parçası, dependency değil), `RateLimiter` (Redis `INCR`+`EXPIRE` tabanlı
+domain-başına sabit-pencere sayaç — spec "token bucket" diyor ama bu daha
+basit bir varyant, aynı garantiyi veriyor: pencere başına host başına en
+fazla N istek), `assertPublicHttpUrl` (SSRF guard — madde "allowlist +
+private IP range engeli"; **hostname string'ine değil DNS'in çözümlediği
+gerçek adrese** bakıyor, çünkü bir hostname DNS rebinding ile private bir
+IP'ye işaret edebilir), `extractText/extractAttr/extractLinks` (cheerio),
+`computeContentHash` (normalize edilmiş metnin sha256'ı — dedup anahtarı).
+
+**Domain: `apps/api/src/blog/scraper`** — `ScraperSourcesService/
+Controller`, `ScraperRulesService/Controller`, `CrawlJobsService/
+Controller` (BullMQ `scraper` kuyruğuna enqueue eden tek yer — API asla
+kendisi taramaz, madde 7: "Uzun süren hiçbir işlem HTTP request içinde
+çalıştırılmaz"), `DataPoolService/Controller` (liste/onayla/reddet/
+yayınla — yayınlama `ContentService.create`'i doğrudan çağırıyor, yeni bir
+"Post" domain servisi yok çünkü `post` typeKey'inin zaten extension
+tablosu yok). Yeni izinler: `SCRAPER_MANAGE`, `DATA_POOL_MANAGE`
+(`CORE_PERMISSIONS`'a eklendi, seed script'i idempotent olduğu için var
+olan SUPER_ADMIN rolüne otomatik eklendi).
+
+**İlk gerçek Redis kullanımı `apps/api`'de** (`core/cache/cache.module.ts`,
+`DatabaseModule`'ün DI-token deseninin birebir aynısı) — daha önce
+`apiEnvSchema` `REDIS_URL`'i zorunlu kılıyordu ama hiçbir şey onu
+okumuyordu.
+
+**apps/worker: `processors/scraper.processor.ts`** — SOURCE → CRAWL → RAW
+DATA → EXTRACTION → NORMALIZATION → CLASSIFICATION → DUPLICATE CHECK
+(madde 10) hepsi bu tek job içinde senkron: liste sayfasını çek, öğe
+linklerini çıkar (crawl başına en fazla 20 — bilinçli sınır), her link için
+SSRF guard + robots.txt + rate limit kontrolü, sayfayı çek, selector'larla
+extract et, `raw_data_items`'a `contentHash` üzerinden
+`onConflictDoNothing` ile dedup'lu insert (bu *DUPLICATE* durumunun ta
+kendisi — ikinci bir satır asla oluşmuyor), yeni olan her satır için
+`data_pool_items` (durum: PROCESSED, çünkü RAW hiç persist edilmiyor —
+extraction zaten senkron). REVIEW/APPROVAL/PUBLISH tamamen ayrı, admin
+tetikli aksiyonlar (`DataPoolService`) — worker asla `contents`'a yazmıyor.
+
+**Bulunan ve düzeltilen buglar:**
+1. **Uygulama bug'ı (küçük, düzeltildi):** `DataPoolService.publish`
+   `data_pool_items.slug`'ı hiç set etmiyordu — `contents` satırı doğru
+   slug'la yaratılıyordu ama data pool'un kendi kaydı `slug: null` kalıyordu.
+   Publish sırasında `input.slug`'ı da yazacak şekilde düzeltildi.
+2. **Uygulama bug'ı (admin, düzeltildi):** `veri-havuzu/actions.ts`'teki
+   `approveAction` API'yi body'siz bir POST ile çağırıyordu; `lib/api.ts`'teki
+   `apiFetch` her zaman `Content-Type: application/json` header'ı
+   ekliyor, ve Fastify boş body + bu header kombinasyonunda "Body cannot
+   be empty when content-type is set to 'application/json'" hatası
+   veriyor. Codebase'teki her önceki POST/PATCH action'ı zaten bir body
+   gönderdiği için bu şimdiye kadar hiç tetiklenmemişti — approveAction
+   body'siz POST atan ilk action'dı. Düzeltme: `body:
+   JSON.stringify({})` eklemek (sunucu tarafında `/approve` zaten bir
+   `@Body()` beklemiyor, sadece Fastify'ın parser'ını tatmin etmek için).
+3. **Test script'inde (uygulama değil):** Data Pool E2E testinde otomatik
+   önerilen slug (`slugify(title)`) sahte test verisinin başlığından
+   deterministik türediği için tekrarlanan test çalıştırmaları arasında
+   çakışıyordu (`contents.slug` unique) — ikinci çalıştırmadan itibaren
+   publish "409 Conflict" ile başarısız oluyordu (bu *doğru* davranış,
+   uygulamanın kendisi doğru reddediyordu). Bunu debug ederken önce
+   yanlışlıkla bir timing sorunu sandım (timeout'u büyüttüm), gerçek kök
+   nedeni `curl` ile API'yi doğrudan çağırıp (başarılı) ve ardından
+   `contents` tablosunda çakışan slug'ı bulunca anladım. Düzeltme: test
+   script'i publish formundaki slug'ı `stamp` ile benzersizleştiriyor.
+
+**Doğrulama (gerçek PostgreSQL + Redis + s3rver + gerçek bir yerel HTTP
+hedefi — `127.0.0.1` üzerinde sahte bir "blog" sitesi, 3 yazı — Docker
+olmadan, gerçek Chromium/Playwright ile uçtan uca):** kaynak oluştur
+(liste URL'i + liste öğesi selector'ı) → kural oluştur (başlık/içerik/
+özet/kapak selector'ları) → "Şimdi tara" → crawl job SUCCESS, 3 bulundu/3
+yeni → Data Pool'da 3 öğe göründüğünü doğrula → bir öğeyi onayla → slug
+girip yayınla → `İçerik` admin'inde doğru başlıkla gerçek bir `contents`
+satırı olarak göründüğünü doğrula → başka bir öğeyi sebep yazarak reddet,
+reddedildiğini ve sebebin göründüğünü doğrula. Ayrıca **SSRF guard**'ı ve
+**rate limiter**'ı testler sırasında ayrı ayrı doğruladım: SSRF guard test
+dışı bırakılmadan önce `127.0.0.1`'i gerçekten blokluyordu (beklenen
+güvenlik davranışı, testler için `SKIP_SSRF_GUARD_FOR_TEST` ile s3rver
+fazındaki `SKIP_BUCKET_POLICY_FOR_TEST` deseninin aynısıyla geçici olarak
+bypass edildi, test bitince kaynak koddan tamamen geri alındı ve paket
+yeniden build edildi); rate limiter da testler sırasında gerçekten devreye
+girip art arda gelen taramalarda bazı item'ları "Rate limit exceeded"
+diyerek atladığını worker log'unda gördüm — ikisi de gerçek, çalışan
+davranışlar, sahte/iddia değil.
+
+**Bilinçli kapsam kararları:** `scheduleCron` alanı var ama okunmuyor —
+taramalar admin'den elle tetikleniyor (gerçek cron scheduler sonraki faz).
+Publish yalnızca `typeKey: "post"` destekliyor (Project/Service/Work'ün
+zorunlu ekstra alanları taranan veride doğal olarak yok). `ScraperRule`
+için update/delete yok (yalnızca list+create, `service_categories`
+emsaliyle aynı desen). Crawl başına en fazla 20 öğe.

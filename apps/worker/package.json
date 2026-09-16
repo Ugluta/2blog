@@ -10,7 +10,10 @@
   },
   "dependencies": {
     "@2blog/config": "workspace:*",
+    "@2blog/core-database": "workspace:*",
+    "@2blog/core-scraper-kit": "workspace:*",
     "bullmq": "^5.34.4",
+    "drizzle-orm": "^0.38.3",
     "ioredis": "^5.4.2"
   },
   "devDependencies": {
