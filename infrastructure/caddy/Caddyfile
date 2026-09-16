@@ -1,0 +1,35 @@
+# Production örneği — {$WEB_DOMAIN} / {$ADMIN_DOMAIN} / {$API_DOMAIN} ortam
+# değişkenlerini gerçek alan adlarıyla (örn. blog.example.com) değiştirin.
+# Caddy bu domainler için otomatik HTTPS/TLS sertifikası sağlar.
+
+{$WEB_DOMAIN:web.localhost} {
+	reverse_proxy web:3000
+	encode gzip zstd
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+	}
+}
+
+{$ADMIN_DOMAIN:admin.localhost} {
+	reverse_proxy admin:3001
+	encode gzip zstd
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+	}
+}
+
+{$API_DOMAIN:api.localhost} {
+	reverse_proxy api:4000
+	encode gzip zstd
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+}
