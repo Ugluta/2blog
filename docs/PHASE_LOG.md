@@ -312,3 +312,65 @@ kategorilerinin admin panelden gerçekten düzenlenmesi (apps/admin hâlâ
 placeholder), `social` kategorisinin gerçek OAuth token'ları tutması
 (PHASE 14'te ayrı, encrypted bir `social_accounts` tablosunda olacak — bu
 genel `settings` blob'una asla girmeyecek).
+
+## Web Frontend — Blog/Hizmetler/Projelerimiz/Yaptıklarımız (tamamlandı)
+
+**apps/web artık gerçek sayfalar render ediyor** (önceki fazlarda yalnızca
+bir health-check placeholder'ıydı). Kapsam: `/`, `/blog(+detay)`,
+`/hizmetler(+detay)`, `/projelerimiz(+detay)`, `/yaptiklarimiz(+detay)` —
+hepsi Server Component, hepsi `lib/api.ts` üzerinden Core API'nin guard'sız
+`/*​/public` uçlarını çağırıyor (ARCHITECTURE.md madde 2/3'ün ilk kez
+gerçek bir frontend'le uçtan uca kanıtlanması). Header/Footer `/menu/public`
+ve `/settings/general`'ı gerçekten çağırıyor — hard-coded nav yok.
+
+**Tailwind eklendi** (`tailwindcss`/`postcss`/`autoprefixer`, apps/web'e).
+`tailwind.config.ts`, renklerini `packages/config`'in `designTokens`'ından
+alıyor — ikinci bir palet kopyası açmak yerine (madde 24). Dark-mode token
+değerleri `packages/config`'te zaten var ama bu fazda henüz bağlanmadı
+(light-only, bilinçli kapsam kesintisi).
+
+**SEO:** her detay sayfası `generateMetadata` ile content'in
+`seoTitle`/`seoDescription`/`canonicalUrl`/`noindex` alanlarını gerçekten
+kullanıyor (fallback: title/excerpt). Yayınlanmamış veya var olmayan slug
+→ `notFound()` → gerçek Next.js 404 (sitemap.xml/robots.txt/JSON-LD ayrı
+bir SEO fazına bırakıldı, PHASE 10-11).
+
+**Bilinçli kapsam kararı:** Master prompt'un public menüsünde ayrıca
+Haberler/İpuçları/SSS/Kütüphane/İstatistikler/İletişim var, ama bunlar
+için sayfa yazılmadı — çünkü news/tip/faq/library content type'ları (Blog
+domain modülünde henüz kayıtlı değil) ve istatistik/iletişim backend'i
+(PHASE 11 Analytics, henüz yok) yok. Var olmayan bir backend'e sahte bir
+frontend sayfası yazmak yerine, gerçekten çalışan dört tür için gerçek
+sayfalar yapıldı.
+
+**Doğrulama (gerçek PostgreSQL + Redis + s3rver'a karşı, Docker olmadan):**
+- Gerçek post/project/service/work içerikleri oluşturup yayınladım (bazıları
+  önceki fazlardan kalma soft-delete edilmiş verilerle çakıştığı için yeni
+  slug'larla), `apps/web`'i build edip başlattım
+- **Önemli operasyonel bulgu (bug değil, Next.js'in belgelenmiş davranışı):**
+  İlk build API'de hiç içerik yokken yapıldığından statik ana sayfa boş
+  snapshot aldı; içerik oluşturduktan hemen sonraki ikinci build de hâlâ
+  eskiyi gösterdi çünkü Next'in fetch/Data Cache'i `.next/cache`'te
+  **build'ler arasında** persist ediyor ve 60s'lik revalidate penceresi
+  henüz dolmamıştı. `.next` temizlenip yeniden build edilince doğru içerik
+  geldi. Bu, gerçek bir production deploy pipeline'ının (build → deploy)
+  neden içerik yayınlandıktan sonra ya cache'i temizlemesi ya da
+  `revalidatePath` tetiklemesi gerektiğini somut olarak gösteriyor.
+- Ana sayfada 4 bölümün de (Hizmetlerimiz/Projelerimiz/Son Yazılar/
+  Yaptıklarımız) gerçek başlıklarla render olduğunu doğruladım
+- Her detay sayfasını curl'ledim: blog `<title>`/meta description doğru,
+  proje teknolojiler+demo/repo linkleri doğru, hizmet özellikler/süreç/SSS/CTA
+  doğru, iş sonuç/bağlantılar doğru
+- **DRAFT içerik web'den 404 döndü** (public API zaten gizliyor, ama bunu
+  frontend üzerinden de doğruladım — API'nin `/​public` guard'ının
+  gerçekten frontend'e kadar korumayı taşıdığının kanıtı)
+- `noindex:true` ile yayınlanan bir yazı `<meta name="robots" content="noindex,
+  nofollow">` döndürdü — `/blog/[slug]`'ın dynamic (build gerektirmeyen)
+  render olduğu için yeniden build etmeden hemen doğru geldiğini de gördüm
+- Var olmayan slug → gerçek Next.js 404 sayfası
+
+**Kapsam dışı bırakılanlar (sonraki fazlar):** apps/admin hâlâ placeholder
+(bir sonraki mantıklı adım), Haberler/İpuçları/SSS/Kütüphane/İstatistikler/
+İletişim sayfaları (ilgili content type'lar/backend hazır olunca), dark
+mode, sitemap.xml/robots.txt/JSON-LD (PHASE 10-11), galeri/video desteği
+(Media modülü hazır ama `ContentMedia` join tablosu yok).

@@ -67,6 +67,21 @@ async function main() {
     await db.insert(schema.settings).values({ category, values }).onConflictDoNothing({ target: schema.settings.category });
   }
 
+  // No natural unique key to onConflictDoNothing against, so this only
+  // seeds on a genuinely empty table — once an admin edits/deletes items,
+  // re-running seed never fights them or re-adds what they removed.
+  const [existingMenuItem] = await db.select({ id: schema.menuItems.id }).from(schema.menuItems).limit(1);
+  if (!existingMenuItem) {
+    await db.insert(schema.menuItems).values([
+      { label: "Ana Sayfa", url: "/", position: 0 },
+      { label: "Blog", url: "/blog", position: 1 },
+      { label: "Hizmetlerimiz", url: "/hizmetler", position: 2 },
+      { label: "Projelerimiz", url: "/projelerimiz", position: 3 },
+      { label: "Yaptıklarımız", url: "/yaptiklarimiz", position: 4 },
+    ]);
+    console.log("Created default menu items");
+  }
+
   console.log("Seed complete");
   process.exit(0);
 }

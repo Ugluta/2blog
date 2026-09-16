@@ -7,8 +7,8 @@ Mimari kararlar ve gerekçeleri için bkz. [`docs/ARCHITECTURE.md`](./docs/ARCHI
 
 ```
 apps/
-  web/      Next.js — public site (UI/SSR/SEO, business logic yok)
-  admin/    Next.js — admin panel (UI, business logic yok)
+  web/      Next.js — public site (Blog/Hizmetler/Projelerimiz/Yaptıklarımız, Tailwind)
+  admin/    Next.js — admin panel (UI, business logic yok, hâlâ placeholder)
   api/      NestJS — tüm business logic, RBAC, validation, audit
   worker/   BullMQ worker — scraper/AI/media/social/email job'ları
 
@@ -112,8 +112,32 @@ yazabileceği bir `onCreated`/`onUpdated` callback kabul ediyor — Core hâlâ
 - `GET /api/v1/menu/public` — herkese açık, yalnızca `isVisible=true` öğeler,
   `position`'a göre sıralı (master prompt madde 3: "Menüler hard-coded
   olmayacak"). `GET/POST/PATCH/DELETE /api/v1/menu` — admin, `SETTINGS_MANAGE`.
-- Seed script varsayılan `general`/`seo`/`social` satırlarını da idempotent
-  şekilde oluşturur.
+- Seed script varsayılan `general`/`seo`/`social` satırlarını, ve DB'de hiç
+  menü öğesi yoksa varsayılan 5 menü öğesini de idempotent şekilde oluşturur.
+
+## Web (public site)
+
+`apps/web` artık gerçek sayfalar render ediyor — hepsi Server Component,
+hepsi `lib/api.ts` üzerinden Core API'nin `/*​/public` uçlarını çağırıyor
+(asla DB'ye doğrudan bağlanmıyor, madde 2/3). Tailwind eklendi;
+`tailwind.config.ts` renklerini `packages/config`'in design token'larından
+alıyor (madde 24) — ikinci bir palet kopyası açmak yerine.
+
+- `/` — özet: son yazılar, öne çıkan hizmet/proje/işler (her biri `getX(..., 3)`)
+- `/blog`, `/blog/[slug]` — `typeKey=post`
+- `/hizmetler`, `/hizmetler/[slug]` — kategori, özellikler, süreç, SSS, CTA
+- `/projelerimiz`, `/projelerimiz/[slug]` — teknolojiler, problem/çözüm/sonuç, demo/repo linkleri
+- `/yaptiklarimiz`, `/yaptiklarimiz/[slug]` — kategori, sonuç, bağlantılar
+- Header/Footer `/menu/public` ve `/settings/general`'ı gerçekten çağırıyor
+  (hard-coded nav yok) — `<title>` template'i de site adını kullanıyor.
+- Her detay sayfası `generateMetadata` ile `seoTitle`/`seoDescription`/
+  `canonicalUrl`/`noindex`'i gerçekten uyguluyor; yayınlanmamış/var olmayan
+  slug → Next.js `notFound()` → gerçek 404.
+- Master prompt'un genel public menüsündeki Haberler/İpuçları/SSS/Kütüphane/
+  İstatistikler/İletişim sayfaları **bilinçli olarak yok** — bu content
+  type'lar (news/tip/faq/library) ve istatistik/iletişim backend'i henüz
+  kurulmadı; var olmayan bir şeyi render eden sayfa yazmak yerine, backend'i
+  olan dört tür (post/project/service/work) için gerçek sayfalar yapıldı.
 
 ## Gereksinimler
 
