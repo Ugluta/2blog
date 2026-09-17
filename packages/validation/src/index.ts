@@ -10,3 +10,4 @@ export * from "./works";
 export * from "./settings";
 export * from "./menu";
 export * from "./scraper";
+export * from "./ai";

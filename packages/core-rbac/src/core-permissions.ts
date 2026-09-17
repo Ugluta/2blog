@@ -20,6 +20,7 @@ export const CORE_PERMISSIONS = [
   { key: "SETTINGS_MANAGE", label: "Sistem ayarlarını ve site navigasyonunu yönet" },
   { key: "SCRAPER_MANAGE", label: "Scraper kaynaklarını/kurallarını yönet, tarama başlat" },
   { key: "DATA_POOL_MANAGE", label: "Data Pool öğelerini incele, onayla/reddet, yayınla" },
+  { key: "AI_USE", label: "AI ile metin üret" },
 ] as const;
 
 export type CorePermissionKey = (typeof CORE_PERMISSIONS)[number]["key"];

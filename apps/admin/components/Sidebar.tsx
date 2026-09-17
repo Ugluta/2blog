@@ -19,6 +19,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/menu", label: "Menü", requiredPermission: "SETTINGS_MANAGE" },
   { href: "/scraper", label: "Scraper", requiredPermission: "SCRAPER_MANAGE" },
   { href: "/veri-havuzu", label: "Data Pool", requiredPermission: "DATA_POOL_MANAGE" },
+  { href: "/ai", label: "AI", requiredPermission: "AI_USE" },
 ];
 
 /**

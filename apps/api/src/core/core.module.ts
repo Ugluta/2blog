@@ -8,6 +8,7 @@ import { UsersModule } from "./users/users.module";
 import { ContentModule } from "./content/content.module";
 import { MediaModule } from "./media/media.module";
 import { SettingsModule } from "./settings/settings.module";
+import { AiModule } from "./ai/ai.module";
 
 /**
  * Aggregates Core's generic modules (ARCHITECTURE.md madde 4/14).
@@ -17,6 +18,6 @@ import { SettingsModule } from "./settings/settings.module";
  * ContentTypeRegistry, never concrete types like "post" or "document".
  */
 @Module({
-  imports: [DatabaseModule, CacheModule, HealthModule, AuthModule, RbacModule, UsersModule, ContentModule, MediaModule, SettingsModule],
+  imports: [DatabaseModule, CacheModule, HealthModule, AuthModule, RbacModule, UsersModule, ContentModule, MediaModule, SettingsModule, AiModule],
 })
 export class CoreModule {}

@@ -613,3 +613,87 @@ Publish yalnızca `typeKey: "post"` destekliyor (Project/Service/Work'ün
 zorunlu ekstra alanları taranan veride doğal olarak yok). `ScraperRule`
 için update/delete yok (yalnızca list+create, `service_categories`
 emsaliyle aynı desen). Crawl başına en fazla 20 öğe.
+
+## AI (tamamlandı)
+
+Master prompt'un AI fazı — `docs/ARCHITECTURE.md` madde 12'nin
+`AIProvider` soyutlaması gerçek koda döküldü. `/ai` uç noktası bilinçli
+olarak **Core seviyesinde** (`apps/api/src/core/ai`) — Scraper'ın aksine
+(o bir Blog domain modülüydü), AI generation herhangi bir domain'in
+kullanabileceği generic bir kapasite, bu yüzden `apps/api/src/blog/`
+altında değil.
+
+**`packages/core-ai`** (yeni paket): `AIProvider` arayüzü — bu fazda
+yalnızca `generateText` (görsel/ses üretimi bilinçli olarak dışarıda
+bırakıldı, aşağıda gerekçesi var). Üç sağlayıcı yazıldı:
+`OllamaProvider` (yerel HTTP sunucusuna karşı, gerçek Ollama `/api/generate`
+kontratıyla), `OpenAiProvider` (OpenAI Chat Completions kontratı),
+`GeminiProvider` (Gemini `generateContent` kontratı). `PromptRegistry` —
+`{{değişken}}` interpolasyonlu, anahtar+versiyon bazlı şablon deposu;
+`ContentTypeRegistry`'nin aynı deseni: domain modülleri kendi promptlarını
+`OnModuleInit`'te kaydediyor, Core hiçbirini bilmiyor.
+
+**Dürüst bir kısıt — bu oturumda gerçekten test edilebilen tek sağlayıcı
+Ollama oldu.** Bu sandbox'ta ne `OPENAI_API_KEY`/`GEMINI_API_KEY` var, ne
+de genel internet erişimi (agent proxy `ollama.com` dahil izin
+listesinde olmayan hiçbir domain'e izin vermiyor — kurulum denemesi bile
+`403` ile reddedildi). `OpenAiProvider`/`GeminiProvider` gerçek API
+kontratlarına karşı yazıldı ve typecheck'ten geçti ama bu ortamda hiç
+canlı çağrılmadı — Scraper fazındaki s3rver/gerçek-blog testleri gibi,
+burada da "gerçek olmayan hiçbir şeyi iddia etme" ilkesine uyarak bunu
+açıkça belirtiyorum. Test edilen tek yol `AI_PROVIDER=ollama` — ve Ollama
+zaten yerel bir HTTP sunucusu olduğu için, gerçek Ollama REST kontratını
+taklit eden küçük bir yerel stub sunucusuna (`/api/generate`,
+`{response, eval_count}` şekli) karşı test edildi; bu, s3rver'ın S3'ü
+veya sahte blog sitesinin gerçek bir blog'u taklit etmesiyle birebir aynı
+desen.
+
+**`apps/api/src/core/ai`**: `AiService` — `AI_PROVIDER` env'inden bir kez
+sağlayıcı seçip enjekte ediyor (istek başına değil), `generateText`
+çağırıp sonucu (başarılı ya da başarısız, ikisi de) `ai_requests`'e
+logluyor (madde 12: "Tüm çağrılar ai_requests'e loglanır"). `ai_requests`
+Core tablosu (`media`/`settings` gibi, domain tablosu değil).
+`AiController`: `POST /ai/generate/text` (`AI_USE` izni) — `prompt`
+(serbest metin) veya `promptKey`+`variables`'tan tam olarak biri zorunlu
+(`generateTextSchema`'nın `.refine()`'ı).
+
+**`apps/api/src/blog/blog.module.ts`**: `AiService`'i inject edip
+`OnModuleInit`'te `blog-post-draft` promptunu kaydediyor — tıpkı content
+type'ları kaydettiği gibi. `AiModule`'ün kendisi bunu hiç bilmiyor (ilk
+yazımda yanlışlıkla AiModule'ün kendi içine bir Blog prompt'u
+kaydetmiştim, kendi mimari yorumumla çelişiyordu — fark edip BlogModule'e
+taşıdım, ContentTypeRegistry'nin gerçek deseniyle birebir aynı hale
+getirdim).
+
+**admin (`/ai`)**: iki adımlı bir araç — 1) konu gir, "Taslak üret"
+(promptKey: "blog-post-draft" ile `/ai/generate/text` çağrılıyor), 2)
+üretilen metni gözden geçir/düzenle, başlık+slug'ı konu'dan otomatik
+öner, "Taslak olarak kaydet". **AI çıktısı asla doğrudan PUBLISHED
+olmuyor** (madde 12) ve bunu sağlamak için özel bir mekanizma da
+yazmadım: "Taslak olarak kaydet" butonu İçerik sayfasının **zaten var
+olan** `createPostAction`'ını doğrudan import edip çağırıyor — aynı
+generic `POST /content` her zaman DRAFT'ta başlıyor. AI'dan Content
+Engine'e özel bir "domain glue" katmanı hiç gerekmedi.
+
+**Doğrulama (gerçek PostgreSQL + Redis + s3rver + yerel bir sahte Ollama
+sunucusu — Docker olmadan, gerçek Chromium/Playwright ile uçtan uca):**
+`/ai` sayfasında konu gir → "Taslak üret" → sahte Ollama'nın ürettiği
+metin (prompt'un kendisini yankılıyor, gerçekten AiService'in
+PromptRegistry'den render ettiği prompt'un sahte sunucuya ulaştığını
+kanıtlıyor) body alanına doldu, sağlayıcı "ollama" olarak gösterildi →
+başlık/slug konu'dan otomatik önerildi → "Taslak olarak kaydet" →
+`/icerik/<id>`'e yönlendi, gerçek bir `contents` satırı `DRAFT`
+durumunda oluştu, İçerik admin'inde göründü. Veritabanında `ai_requests`
+satırını doğrudan sorgulayıp `provider=ollama`, `promptKey=blog-post-draft`,
+render edilmiş `prompt`'un `{{topic}}`'i gerçekten konu metniyle
+değiştirdiğini, `tokensUsed=42` (sahte sunucunun döndürdüğü
+`eval_count`), `status=SUCCESS` olduğunu doğruladım.
+
+**Bilinçli kapsam kararları:** `generateImage`/`generateAudio` yok —
+madde 7'nin "ağır işlemler BullMQ üzerinden asenkron" kuralı bunlar için
+geçerli olacağından, bunları eklemek yalnızca `AIProvider`'a bir metod
+daha eklemek değil, ayrı bir kuyruk-destekli akış (job durumu sorgulama
+endpoint'i dahil) gerektiriyor — bu fazın kapsamı dışında bırakıldı.
+`/ai/generate/image|summary` gibi diğer master-prompt uç noktaları da bu
+yüzden yok. `OpenAiProvider`/`GeminiProvider` yazıldı ama hiç canlı test
+edilemedi (yukarıda gerekçesi var).

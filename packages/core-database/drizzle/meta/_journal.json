@@ -43,6 +43,13 @@
       "when": 1789600800897,
       "tag": "0005_fresh_leo",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789615429736,
+      "tag": "0006_fancy_cerebro",
+      "breakpoints": true
     }
   ]
 }

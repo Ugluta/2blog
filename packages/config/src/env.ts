@@ -37,11 +37,30 @@ export const authEnvSchema = z.object({
   JWT_REFRESH_TTL: z.string().default("30d"),
 });
 
+/**
+ * Only the configured `AI_PROVIDER`'s own key/model is required — picking
+ * "ollama" (the default; no external API key, runs against a local
+ * server) never forces `OPENAI_API_KEY`/`GEMINI_API_KEY` to be set. Kept
+ * as a plain (mergeable) object; the cross-field check lives in
+ * `apiEnvSchema` below since `.superRefine()` output can't itself be
+ * `.merge()`-d.
+ */
+export const aiEnvSchema = z.object({
+  AI_PROVIDER: z.enum(["openai", "gemini", "ollama"]).default("ollama"),
+  OPENAI_API_KEY: z.string().optional(),
+  AI_OPENAI_MODEL: z.string().default("gpt-4o-mini"),
+  GEMINI_API_KEY: z.string().optional(),
+  AI_GEMINI_MODEL: z.string().default("gemini-1.5-flash"),
+  AI_OLLAMA_BASE_URL: z.string().url().default("http://localhost:11434"),
+  AI_OLLAMA_MODEL: z.string().default("llama3.2"),
+});
+
 export const apiEnvSchema = nodeEnvSchema
   .merge(databaseEnvSchema)
   .merge(redisEnvSchema)
   .merge(storageEnvSchema)
   .merge(authEnvSchema)
+  .merge(aiEnvSchema)
   .extend({
     API_PORT: z.coerce.number().int().positive().default(4000),
     CORS_ORIGINS: z
@@ -49,6 +68,14 @@ export const apiEnvSchema = nodeEnvSchema
       .default("")
       .transform((value) => value.split(",").map((origin) => origin.trim()).filter(Boolean)),
     MEDIA_MAX_UPLOAD_MB: z.coerce.number().int().positive().default(25),
+  })
+  .superRefine((value, ctx) => {
+    if (value.AI_PROVIDER === "openai" && !value.OPENAI_API_KEY) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["OPENAI_API_KEY"], message: "required when AI_PROVIDER=openai" });
+    }
+    if (value.AI_PROVIDER === "gemini" && !value.GEMINI_API_KEY) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["GEMINI_API_KEY"], message: "required when AI_PROVIDER=gemini" });
+    }
   });
 
 export const workerEnvSchema = nodeEnvSchema

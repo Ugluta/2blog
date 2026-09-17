@@ -22,6 +22,7 @@ packages/
   core-content-engine/        content workflow state machine + type registry
   core-media/                   StorageProvider abstraction (S3/MinIO), mime sniffing
   core-scraper-kit/               HTTP fetch+retry, robots.txt, SSRF guard, rate limiter, HTML extraction
+  core-ai/                          AIProvider arayüzü + openai/gemini/ollama, PromptRegistry
 ```
 
 ## Auth & RBAC (PHASE 3)
@@ -156,6 +157,48 @@ SOURCE → CRAWL → RAW DATA → EXTRACTION → NORMALIZATION → CLASSIFICATIO
   kendi zorunlu alanları (teknolojiler, kategori, ...) taranan ham veride
   doğal olarak yok, var olmayan alanlara sahte değer uydurmak yerine bu
   akış post'la sınırlı tutuldu.
+
+## AI
+
+`docs/ARCHITECTURE.md` madde 12'nin AI Provider mimarisi — tek bir
+`AIProvider` arayüzü, arkasında değiştirilebilir sağlayıcılar. `/ai`
+endpoint'i **Core seviyesinde** (`apps/api/src/core/ai`), Blog'a özel
+değil — herhangi bir gelecekteki domain (Evrak, Koli, ...) aynı uç noktayı
+kullanabilir.
+
+- **`packages/core-ai`**: `AIProvider` arayüzü (şimdilik yalnızca
+  `generateText` — görsel/ses üretimi kasıtlı olarak bu fazın dışında,
+  madde 7'nin "ağır işlemler BullMQ üzerinden asenkron" kuralı onlar için
+  geçerli olacağından sadece "bir metod daha ekle" değil, kuyruk-destekli
+  ayrı bir yol gerektiriyor). Üç sağlayıcı: `OllamaProvider` (yerel HTTP
+  sunucusu, API key gerektirmez), `OpenAiProvider`, `GeminiProvider`
+  (ikisi de gerçek REST kontratlarına karşı yazıldı ve typecheck'ten
+  geçti, ama bu sandbox'ta ne API key'leri ne de dış ağ erişimi var — hiç
+  canlı olarak çalıştırılamadılar, `docs/PHASE_LOG.md`'de dürüstçe not
+  edildi). `PromptRegistry` — versiyonlu, merkezi prompt şablonları;
+  domain modülleri kendi promptlarını buraya kaydediyor (`BlogModule`
+  `blog-post-draft`'ı kaydediyor), Core hiçbirini kendisi bilmiyor.
+- **`POST /api/v1/ai/generate/text`** (`AI_USE` izni) — `prompt` (serbest
+  metin) veya `promptKey`+`variables` (registry'den render) kabul ediyor,
+  ikisinden tam olarak biri zorunlu. Her çağrı `ai_requests`'e loglanıyor
+  (madde 12: "Tüm çağrılar ai_requests'e loglanır") — başarılı da
+  başarısız da, `provider`/`promptKey`/`prompt`/`tokensUsed`/`status`
+  ile.
+- **AI çıktısı asla doğrudan PUBLISHED olmuyor** (madde 12) — ve bunun
+  için Core'da özel bir mekanizma da yok: admin panelinin "AI ile Taslak
+  Oluştur" aracı (`/ai`) üretilen metni gözden geçirmeye zorluyor, sonra
+  İçerik'in **zaten var olan** `createPostAction`'ını (aynen İçerik
+  sayfasındaki gibi) çağırıp normal bir `POST /content` ile DRAFT
+  oluşturuyor — AI'dan Content Engine'e özel bir "domain glue" yazmaya
+  hiç gerek kalmadı, iki generic endpoint admin tarafında zincirlendi.
+- **İlk gerçek Redis kullanımından sonra ilk gerçek çoklu-sağlayıcı
+  yapılandırma deseni**: `AI_PROVIDER` (openai/gemini/ollama, varsayılan
+  ollama) `apps/api` başlangıcında bir kez okunup sağlayıcı seçiliyor;
+  seçilmeyen sağlayıcıların API key'leri asla zorunlu değil (zod
+  `superRefine` ile yalnızca seçili sağlayıcının key'i kontrol ediliyor).
+- **Bilinçli kapsam kararları:** `generateImage`/`generateAudio` yok
+  (yukarıda gerekçelendirildi). `/ai/generate/image|summary` gibi diğer
+  master-prompt uç noktaları henüz yok — yalnızca `text`.
 
 ## System Settings & Menü
 
