@@ -8,12 +8,12 @@ export default async function WorksListPage() {
   const works = await getWorks();
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-12">
-      <h1 className="mb-8 text-2xl font-bold">Yaptıklarımız</h1>
+    <main className="mx-auto max-w-5xl px-4 py-16">
+      <h1 className="mb-10 text-3xl font-bold tracking-tight">Yaptıklarımız</h1>
       {works.items.length === 0 ? (
         <p className="text-foreground/60">Henüz yayınlanmış kayıt yok.</p>
       ) : (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {works.items.map((work) => (
             <ContentCard
               key={work.id}

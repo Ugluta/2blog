@@ -2,16 +2,22 @@
  * Central design tokens (madde 24, master prompt). packages/ui and both Next.js
  * apps consume these instead of hard-coding colors/spacing/typography/radius —
  * this is the single source of truth referenced by the future Tailwind config.
+ *
+ * Light-only, deliberately — a corporate/tech-product look (crisp white
+ * surfaces, a single confident accent, restrained neutrals), not a
+ * light+dark system with a switcher. No `dark` variants are defined; adding
+ * dark mode later means adding them back here, not overriding utilities
+ * per-component.
  */
 
 export const colorTokens = {
-  background: { light: "#ffffff", dark: "#0a0a0a" },
-  foreground: { light: "#0a0a0a", dark: "#f5f5f5" },
-  primary: { light: "#2563eb", dark: "#3b82f6" },
-  muted: { light: "#f4f4f5", dark: "#18181b" },
-  border: { light: "#e4e4e7", dark: "#27272a" },
-  danger: { light: "#dc2626", dark: "#f87171" },
-  success: { light: "#16a34a", dark: "#4ade80" },
+  background: "#ffffff",
+  foreground: "#0f172a",
+  primary: "#4338ca",
+  muted: "#f8fafc",
+  border: "#e2e8f0",
+  danger: "#dc2626",
+  success: "#16a34a",
 } as const;
 
 export const spacingTokens = {
@@ -32,7 +38,7 @@ export const radiusTokens = {
 
 export const typographyTokens = {
   fontFamily: {
-    sans: "var(--font-sans, system-ui, sans-serif)",
+    sans: "var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif)",
   },
   fontSize: {
     xs: "0.75rem",

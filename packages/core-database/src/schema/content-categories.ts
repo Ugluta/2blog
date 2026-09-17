@@ -1,4 +1,4 @@
-import { pgTable, uuid, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, uuid, primaryKey, index } from "drizzle-orm/pg-core";
 import { contents } from "./contents";
 import { categories } from "./categories";
 
@@ -12,5 +12,8 @@ export const contentCategories = pgTable(
       .notNull()
       .references(() => categories.id, { onDelete: "cascade" }),
   },
-  (table) => [primaryKey({ columns: [table.contentId, table.categoryId] })],
+  // The PK covers "categories for this content" (contentId is its leftmost
+  // column); ContentService.listInternal's categoryId filter needs the
+  // reverse direction, which the PK alone can't serve.
+  (table) => [primaryKey({ columns: [table.contentId, table.categoryId] }), index("content_categories_category_id_idx").on(table.categoryId)],
 );

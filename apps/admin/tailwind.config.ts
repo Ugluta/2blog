@@ -7,13 +7,16 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: designTokens.color.background.light,
-        foreground: designTokens.color.foreground.light,
-        primary: designTokens.color.primary.light,
-        muted: designTokens.color.muted.light,
-        border: designTokens.color.border.light,
-        danger: designTokens.color.danger.light,
-        success: designTokens.color.success.light,
+        background: designTokens.color.background,
+        foreground: designTokens.color.foreground,
+        primary: designTokens.color.primary,
+        muted: designTokens.color.muted,
+        border: designTokens.color.border,
+        danger: designTokens.color.danger,
+        success: designTokens.color.success,
+      },
+      fontFamily: {
+        sans: designTokens.typography.fontFamily.sans,
       },
       borderRadius: designTokens.radius,
     },

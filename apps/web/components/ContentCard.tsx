@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SafeImage } from "./SafeImage";
 
 export interface ContentCardProps {
   href: string;
@@ -12,12 +13,14 @@ export function ContentCard({ href, title, excerpt, coverImage, meta }: ContentC
   return (
     <Link
       href={href}
-      className="block rounded-lg border border-border p-5 transition-colors hover:border-primary"
+      className="group block rounded-lg border border-border bg-background p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
     >
-      {coverImage ? <img src={coverImage} alt="" className="mb-4 aspect-video w-full rounded-md object-cover" /> : null}
-      <h3 className="text-lg font-semibold">{title}</h3>
+      {coverImage ? (
+        <SafeImage src={coverImage} alt="" className="mb-4 aspect-video w-full overflow-hidden rounded-md" sizes="(min-width: 640px) 33vw, 100vw" />
+      ) : null}
+      <h3 className="text-lg font-semibold group-hover:text-primary">{title}</h3>
       {excerpt ? <p className="mt-2 text-sm text-foreground/70">{excerpt}</p> : null}
-      {meta ? <p className="mt-3 text-xs uppercase tracking-wide text-foreground/50">{meta}</p> : null}
+      {meta ? <p className="mt-3 text-xs font-medium uppercase tracking-wide text-foreground/50">{meta}</p> : null}
     </Link>
   );
 }

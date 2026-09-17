@@ -1,3 +1,4 @@
+import Image from "next/image";
 import type { CursorPage, Media } from "@2blog/types";
 import { apiFetch } from "../../../lib/api";
 import { deleteMediaAction, uploadMediaAction } from "./actions";
@@ -23,7 +24,9 @@ export default async function MediaLibraryPage() {
           {page.items.map((media) => (
             <div key={media.id} className="rounded-lg border border-border bg-background p-2">
               {media.kind === "IMAGE" ? (
-                <img src={media.url} alt={media.altText ?? ""} className="aspect-square w-full rounded object-cover" />
+                <div className="relative aspect-square w-full overflow-hidden rounded">
+                  <Image src={media.url} alt={media.altText ?? ""} fill sizes="(min-width: 1024px) 16vw, (min-width: 640px) 25vw, 50vw" className="object-cover" />
+                </div>
               ) : (
                 <div className="flex aspect-square w-full items-center justify-center rounded bg-muted text-xs text-foreground/60">
                   {media.kind}

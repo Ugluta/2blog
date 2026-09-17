@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getServiceBySlug } from "../../../lib/api";
+import { SafeImage } from "../../../components/SafeImage";
+import { jsonLdScriptProps } from "../../../lib/json-ld";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -24,19 +26,30 @@ export default async function ServicePage({ params }: Props) {
   const service = await getServiceBySlug(slug);
   if (!service) notFound();
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Service",
+    name: service.title,
+    description: service.excerpt ?? undefined,
+    image: service.coverImage ?? undefined,
+  };
+
   return (
-    <main className="mx-auto max-w-3xl px-4 py-12">
+    <main className="mx-auto max-w-3xl px-4 py-16">
+      <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScriptProps(jsonLd)} />
       <article>
-        {service.category ? <p className="text-sm font-medium text-primary">{service.category.name}</p> : null}
-        <h1 className="mt-1 text-3xl font-bold">{service.title}</h1>
-        {service.excerpt ? <p className="mt-3 text-foreground/70">{service.excerpt}</p> : null}
-        {service.coverImage ? <img src={service.coverImage} alt="" className="my-8 w-full rounded-lg object-cover" /> : null}
-        {service.body ? <div className="whitespace-pre-wrap leading-relaxed">{service.body}</div> : null}
+        {service.category ? <p className="text-sm font-semibold uppercase tracking-wide text-primary">{service.category.name}</p> : null}
+        <h1 className="mt-2 text-4xl font-bold tracking-tight">{service.title}</h1>
+        {service.excerpt ? <p className="mt-4 text-lg text-foreground/70">{service.excerpt}</p> : null}
+        {service.coverImage ? (
+          <SafeImage src={service.coverImage} alt="" className="my-10 aspect-[21/9] w-full overflow-hidden rounded-xl" priority />
+        ) : null}
+        {service.body ? <div className="text-[1.0625rem] leading-relaxed text-foreground/90 whitespace-pre-wrap">{service.body}</div> : null}
 
         {service.features.length > 0 && (
-          <section className="mt-10">
+          <section className="mt-12 rounded-xl border border-border bg-muted p-6">
             <h2 className="text-lg font-semibold">Özellikler</h2>
-            <ul className="mt-3 list-inside list-disc space-y-1 text-foreground/80">
+            <ul className="mt-3 list-inside list-disc space-y-1.5 text-foreground/80">
               {service.features.map((feature, index) => (
                 <li key={index}>{feature}</li>
               ))}
@@ -45,9 +58,9 @@ export default async function ServicePage({ params }: Props) {
         )}
 
         {service.process.length > 0 && (
-          <section className="mt-10">
+          <section className="mt-8">
             <h2 className="text-lg font-semibold">Süreç</h2>
-            <ol className="mt-3 list-inside list-decimal space-y-1 text-foreground/80">
+            <ol className="mt-3 list-inside list-decimal space-y-1.5 text-foreground/80">
               {service.process.map((step, index) => (
                 <li key={index}>{step}</li>
               ))}
@@ -56,9 +69,9 @@ export default async function ServicePage({ params }: Props) {
         )}
 
         {service.faq.length > 0 && (
-          <section className="mt-10">
+          <section className="mt-10 border-t border-border pt-8">
             <h2 className="text-lg font-semibold">Sık Sorulan Sorular</h2>
-            <div className="mt-3 space-y-4">
+            <div className="mt-4 space-y-5">
               {service.faq.map((entry, index) => (
                 <div key={index}>
                   <p className="font-medium">{entry.question}</p>
@@ -72,7 +85,7 @@ export default async function ServicePage({ params }: Props) {
         {service.ctaUrl && service.ctaLabel ? (
           <a
             href={service.ctaUrl}
-            className="mt-10 inline-block rounded-md bg-primary px-5 py-3 font-medium text-background hover:opacity-90"
+            className="mt-10 inline-block rounded-md bg-primary px-6 py-3 font-medium text-background shadow-sm transition-opacity hover:opacity-90"
           >
             {service.ctaLabel}
           </a>

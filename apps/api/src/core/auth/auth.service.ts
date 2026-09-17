@@ -13,6 +13,7 @@ import {
 import type { AuthenticatedUser } from "@2blog/types";
 import { DATABASE_CONNECTION } from "../database/database.constants";
 import { UsersService } from "../users/users.service";
+import { LoginRateLimiterService } from "./login-rate-limiter.service";
 
 export interface SessionMeta {
   userAgent?: string;
@@ -32,19 +33,25 @@ export class AuthService {
   constructor(
     @Inject(DATABASE_CONNECTION) private readonly db: Database,
     private readonly usersService: UsersService,
+    private readonly loginRateLimiter: LoginRateLimiterService,
   ) {}
 
   async login(email: string, password: string, meta: SessionMeta): Promise<AuthResult> {
+    await this.loginRateLimiter.assertNotRateLimited(meta.ipAddress ?? "unknown", email);
+
     const user = await this.usersService.findByEmailWithPassword(email);
     if (!user || !(await verifyPassword(user.passwordHash, password))) {
+      await this.loginRateLimiter.recordFailure(email);
       throw new UnauthorizedException("Invalid email or password");
     }
 
     const authUser = await this.usersService.getAuthenticatedUser(user.id);
     if (!authUser) {
+      await this.loginRateLimiter.recordFailure(email);
       throw new UnauthorizedException("Invalid email or password");
     }
 
+    await this.loginRateLimiter.recordSuccess(email);
     return this.issueSession(authUser, randomUUID(), meta);
   }
 

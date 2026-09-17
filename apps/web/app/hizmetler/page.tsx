@@ -8,12 +8,12 @@ export default async function ServicesListPage() {
   const services = await getServices();
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-12">
-      <h1 className="mb-8 text-2xl font-bold">Hizmetlerimiz</h1>
+    <main className="mx-auto max-w-5xl px-4 py-16">
+      <h1 className="mb-10 text-3xl font-bold tracking-tight">Hizmetlerimiz</h1>
       {services.items.length === 0 ? (
         <p className="text-foreground/60">Henüz yayınlanmış hizmet yok.</p>
       ) : (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {services.items.map((service) => (
             <ContentCard
               key={service.id}

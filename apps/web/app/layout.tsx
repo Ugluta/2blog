@@ -7,9 +7,16 @@ import "./globals.css";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getGeneralSettings();
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
   return {
     title: { default: settings.siteName, template: `%s — ${settings.siteName}` },
     description: settings.siteDescription,
+    metadataBase: siteUrl ? new URL(siteUrl) : undefined,
+    openGraph: {
+      siteName: settings.siteName,
+      type: "website",
+      locale: "tr_TR",
+    },
   };
 }
 

@@ -3,7 +3,14 @@
 @tailwind utilities;
 
 body {
-  @apply bg-background text-foreground antialiased;
+  @apply bg-background font-sans text-foreground antialiased;
+  font-feature-settings: "cv11", "ss01";
+}
+
+h1,
+h2,
+h3 {
+  @apply tracking-tight;
 }
 
 a {

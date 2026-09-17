@@ -1,4 +1,4 @@
-import { pgTable, uuid, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, uuid, primaryKey, index } from "drizzle-orm/pg-core";
 import { contents } from "./contents";
 import { tags } from "./tags";
 
@@ -12,5 +12,7 @@ export const contentTags = pgTable(
       .notNull()
       .references(() => tags.id, { onDelete: "cascade" }),
   },
-  (table) => [primaryKey({ columns: [table.contentId, table.tagId] })],
+  // Same reasoning as content_categories — the reverse (by-tag) direction
+  // needs its own index, the PK only covers by-content.
+  (table) => [primaryKey({ columns: [table.contentId, table.tagId] }), index("content_tags_tag_id_idx").on(table.tagId)],
 );

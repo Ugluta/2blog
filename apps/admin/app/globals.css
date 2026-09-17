@@ -3,13 +3,19 @@
 @tailwind utilities;
 
 body {
-  @apply bg-muted text-foreground antialiased;
+  @apply bg-muted font-sans text-foreground antialiased;
+}
+
+h1,
+h2,
+h3 {
+  @apply tracking-tight;
 }
 
 input,
 textarea,
 select {
-  @apply rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary;
+  @apply rounded-md border border-border bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20;
 }
 
 label {

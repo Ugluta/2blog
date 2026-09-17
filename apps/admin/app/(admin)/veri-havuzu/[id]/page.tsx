@@ -75,6 +75,9 @@ export default async function DataPoolItemPage({ params }: Props) {
       ) : null}
 
       {item.coverImage ? (
+        // Scraped from an arbitrary external site — intentionally not next/image:
+        // the optimizer would fetch/resize whatever host this points to, which is
+        // exactly what next.config.ts's remotePatterns allowlist exists to prevent.
         // eslint-disable-next-line @next/next/no-img-element
         <img src={item.coverImage} alt="" className="mb-4 max-h-80 rounded-md object-cover" />
       ) : null}

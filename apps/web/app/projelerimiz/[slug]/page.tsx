@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getProjectBySlug } from "../../../lib/api";
+import { SafeImage } from "../../../components/SafeImage";
+import { jsonLdScriptProps } from "../../../lib/json-ld";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -33,14 +35,26 @@ export default async function ProjectPage({ params }: Props) {
   const project = await getProjectBySlug(slug);
   if (!project) notFound();
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "CreativeWork",
+    name: project.title,
+    description: project.excerpt ?? undefined,
+    image: project.coverImage ?? undefined,
+    dateModified: project.updatedAt,
+  };
+
   return (
-    <main className="mx-auto max-w-3xl px-4 py-12">
+    <main className="mx-auto max-w-3xl px-4 py-16">
+      <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScriptProps(jsonLd)} />
       <article>
-        <p className="text-sm font-medium text-primary">{PROJECT_STATUS_LABELS[project.projectStatus] ?? project.projectStatus}</p>
-        <h1 className="mt-1 text-3xl font-bold">{project.title}</h1>
-        {project.excerpt ? <p className="mt-3 text-foreground/70">{project.excerpt}</p> : null}
-        {project.coverImage ? <img src={project.coverImage} alt="" className="my-8 w-full rounded-lg object-cover" /> : null}
-        {project.body ? <div className="whitespace-pre-wrap leading-relaxed">{project.body}</div> : null}
+        <p className="text-sm font-semibold uppercase tracking-wide text-primary">{PROJECT_STATUS_LABELS[project.projectStatus] ?? project.projectStatus}</p>
+        <h1 className="mt-2 text-4xl font-bold tracking-tight">{project.title}</h1>
+        {project.excerpt ? <p className="mt-4 text-lg text-foreground/70">{project.excerpt}</p> : null}
+        {project.coverImage ? (
+          <SafeImage src={project.coverImage} alt="" className="my-10 aspect-[21/9] w-full overflow-hidden rounded-xl" priority />
+        ) : null}
+        {project.body ? <div className="text-[1.0625rem] leading-relaxed text-foreground/90 whitespace-pre-wrap">{project.body}</div> : null}
 
         {project.technologies.length > 0 && (
           <div className="mt-8 flex flex-wrap gap-2">

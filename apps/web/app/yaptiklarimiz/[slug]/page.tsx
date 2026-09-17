@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getWorkBySlug } from "../../../lib/api";
+import { SafeImage } from "../../../components/SafeImage";
+import { jsonLdScriptProps } from "../../../lib/json-ld";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -24,17 +26,29 @@ export default async function WorkPage({ params }: Props) {
   const work = await getWorkBySlug(slug);
   if (!work) notFound();
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "CreativeWork",
+    name: work.title,
+    description: work.excerpt ?? undefined,
+    image: work.coverImage ?? undefined,
+    dateCreated: work.workDate ?? undefined,
+  };
+
   return (
-    <main className="mx-auto max-w-3xl px-4 py-12">
+    <main className="mx-auto max-w-3xl px-4 py-16">
+      <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScriptProps(jsonLd)} />
       <article>
-        {work.category ? <p className="text-sm font-medium text-primary">{work.category}</p> : null}
-        <h1 className="mt-1 text-3xl font-bold">{work.title}</h1>
+        {work.category ? <p className="text-sm font-semibold uppercase tracking-wide text-primary">{work.category}</p> : null}
+        <h1 className="mt-2 text-4xl font-bold tracking-tight">{work.title}</h1>
         {work.workDate ? (
-          <p className="mt-2 text-sm text-foreground/60">{new Date(work.workDate).toLocaleDateString("tr-TR")}</p>
+          <p className="mt-3 text-sm text-foreground/60">{new Date(work.workDate).toLocaleDateString("tr-TR")}</p>
         ) : null}
-        {work.excerpt ? <p className="mt-3 text-foreground/70">{work.excerpt}</p> : null}
-        {work.coverImage ? <img src={work.coverImage} alt="" className="my-8 w-full rounded-lg object-cover" /> : null}
-        {work.body ? <div className="whitespace-pre-wrap leading-relaxed">{work.body}</div> : null}
+        {work.excerpt ? <p className="mt-4 text-lg text-foreground/70">{work.excerpt}</p> : null}
+        {work.coverImage ? (
+          <SafeImage src={work.coverImage} alt="" className="my-10 aspect-[21/9] w-full overflow-hidden rounded-xl" priority />
+        ) : null}
+        {work.body ? <div className="text-[1.0625rem] leading-relaxed text-foreground/90 whitespace-pre-wrap">{work.body}</div> : null}
 
         {work.technologies.length > 0 && (
           <div className="mt-8 flex flex-wrap gap-2">

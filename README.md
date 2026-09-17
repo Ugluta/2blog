@@ -30,6 +30,9 @@ packages/
 - `POST /api/v1/auth/login|refresh|logout` — refresh token rotation + reuse
   detection (bkz. `docs/ARCHITECTURE.md` madde 8). Public registration
   endpoint'i yok; ilk admin kullanıcı seed script ile oluşturulur.
+- `POST /api/v1/auth/login` ayrıca Redis tabanlı çift rate limit'e sahip:
+  IP başına 15dk'da 20 deneme, email başına 15dk'da 5 **başarısız**
+  deneme (başarılı login'de sıfırlanır) — `login-rate-limiter.service.ts`.
 - `GET /api/v1/users/me` — geçerli access token yeterli.
 - `GET/POST /api/v1/roles`, `POST /api/v1/roles/:id/permissions`,
   `GET /api/v1/permissions`, `POST /api/v1/users/:id/roles` — `ROLE_VIEW` /
@@ -237,6 +240,19 @@ alıyor (madde 24) — ikinci bir palet kopyası açmak yerine.
   type'lar (news/tip/faq/library) ve istatistik/iletişim backend'i henüz
   kurulmadı; var olmayan bir şeyi render eden sayfa yazmak yerine, backend'i
   olan dört tür (post/project/service/work) için gerçek sayfalar yapıldı.
+- `sitemap.xml`/`robots.txt` (`app/sitemap.ts`/`app/robots.ts`) — tüm
+  yayınlanmış içeriği cursor pagination'la toplayıp `noindex` olanları
+  filtreliyor, `revalidate = 3600` ile build-time'da donmuyor. Her detay
+  sayfasında XSS-bilinçli (`<` → `<` kaçışlı) JSON-LD (`Article`/
+  `CreativeWork`/`Service`/`Organization`). Kapak görselleri `SafeImage`
+  üzerinden — yalnızca kendi storage host'u `next/image` ile optimize
+  edilir, serbest/scraper URL'leri (SSRF riski) düz `<img>`'e düşer.
+- **Tasarım kasıtlı olarak light-only** — dark mode token'ları
+  `packages/config`'ten tamamen kaldırıldı (bağlanmamış bırakılmadı,
+  silindi). Palet kurumsal/tech ürün hissi için seçildi
+  (`primary:#4338ca`); font `next/font/google` yerine sistem-fontu
+  fallback zinciri kullanıyor (bu sandbox'ta Next'in font indiricisinin
+  proxy CA bundle'ını saymaması nedeniyle — `docs/PHASE_LOG.md`'de detaylı).
 
 ## Admin (apps/admin)
 
@@ -279,8 +295,8 @@ paneli. `apps/web` gibi hiçbir zaman DB'ye doğrudan bağlanmıyor, her şey
 - **Ayarlar (`/ayarlar`):** general/seo/social, kategori başına ayrı
   `PATCH` (madde 15'in "kategori bazlı GET/PATCH"ı).
 - **Menü (`/menu`):** tam CRUD — oluştur/düzenle/sil, `isVisible`/`position`.
-- **Kapsam dışı bırakılanlar:** dark mode. Bunun dışında master prompt'un
-  admin kapsamındaki her domain artık bir arayüze sahip.
+
+Master prompt'un admin kapsamındaki her domain artık bir arayüze sahip.
 
 **Bulunan ve düzeltilen bug (test script'i, uygulama değil):** İçerik
 oluşturma formunu Playwright ile uçtan uca test ederken, form submit

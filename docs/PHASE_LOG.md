@@ -697,3 +697,132 @@ endpoint'i dahil) gerektiriyor — bu fazın kapsamı dışında bırakıldı.
 `/ai/generate/image|summary` gibi diğer master-prompt uç noktaları da bu
 yüzden yok. `OpenAiProvider`/`GeminiProvider` yazıldı ama hiç canlı test
 edilemedi (yukarıda gerekçesi var).
+
+## Güvenlik + SEO + Performans + Kurumsal Tasarım Sertleştirme (tamamlandı)
+
+Önceki fazlarda birikmiş, kod inceleme sırasında somut olarak tespit
+edilen dört bağımsız açık tek fazda birlikte kapatıldı: `/auth/login`'de
+rate limit yoktu (ARCHITECTURE.md'nin açıkça istediği halde), sitemap.xml/
+robots.txt/JSON-LD hiç yoktu, hiçbir yerde `next/image` kullanılmıyordu,
+foreign key kolonlarının çoğunda index yoktu. Bu fazda ayrıca kullanıcı
+açık talimatıyla dark mode token'ları **tamamen** kaldırıldı (bağlanmamış
+bırakılmadı — sildik) ve genel görsel dil "kurumsal/tech şirketi" hissi
+verecek şekilde yeniden çizildi.
+
+**Login rate limiting (`apps/api/src/core/auth/login-rate-limiter.service.ts`,
+yeni):** Scraper fazındaki `core-scraper-kit`'in `RateLimiter`'ıyla aynı
+Redis `INCR`+`EXPIRE` sabit-pencere deseni, kasıtlı olarak yeniden
+yazıldı (Auth'u Scraper'a bağımlı kılmamak için import edilmedi). Çift
+sınır: IP başına geniş sınır (15dk'da 20 deneme, her denemeyi sayar) +
+email başına dar sınır (15dk'da 5 **başarısız** deneme, başarılı login'de
+sıfırlanır). `AuthService.login`, `assertNotRateLimited`'ı en başta
+çağırıyor, her iki başarısızlık yolunda (`recordFailure`) ve başarıda
+(`recordSuccess`) doğru şekilde güncelliyor.
+
+**Dark mode kaldırma + kurumsal tasarım (`packages/config/src/tokens.ts`
+ve iki `tailwind.config.ts`):** `colorTokens` `{light,dark}` yapısından
+düz string'lere indirgendi — yeni palet (`primary:#4338ca`,
+`background:#ffffff`, `foreground:#0f172a`, ...) "tech şirketi" hissi
+için seçildi. `next/font/google` (Inter) önce denendi ama bu sandbox'ta
+Next.js'in kendi font indiricisi `NODE_EXTRA_CA_CERTS`'i (agent proxy CA
+bundle'ı) saymıyor — düz Node `fetch()` aynı URL'i başarıyla çekerken
+`next build` "self-signed certificate in certificate chain" hatasıyla
+patlıyordu. Bu, projenin kendi Docker/CI build'ini de aynı şekilde
+kırabilecek bir dış build-time bağımlılığı olduğundan, `next/font/google`
+tamamen çıkarılıp `var(--font-sans, -apple-system, ..., sans-serif)`
+sistem-fontu fallback deseni kullanıldı (daha sağlam, sıfır dış
+bağımlılık). Header/Footer/kartlar sticky+blur header, hover
+mikro-etkileşimleri, sıkılaştırılmış tipografi ile yeniden çizildi.
+
+**SSRF-bilinçli görsel optimizasyonu (`apps/web/components/SafeImage.tsx`,
+yeni):** `coverImage` alanları serbest URL (admin'in yapıştırdığı ya da
+scraper'ın bulduğu) olduğundan, Next.js image optimizer'ını herhangi bir
+host'a açmak Scraper fazındaki SSRF guard'ın önlediği risk sınıfını
+görsel optimizasyonu üzerinden geri açardı. `SafeImage`, yalnızca
+deployment'ın kendi storage host'unu (`next.config.ts`'in
+`images.remotePatterns`'ı) `next/image` ile optimize ediyor, diğer her
+host için düz `<img>`'e düşüyor. `apps/admin`'de `medya` sayfası (her
+zaman kendi storage'ı, tam güvenilir) doğrudan `next/image` kullanıyor;
+`veri-havuzu/[id]` sayfası (scraper'ın bulduğu ham `coverImage`) kasıtlı
+olarak düz `<img>`'de bırakıldı.
+
+**JSON-LD (`apps/web/lib/json-ld.ts`, yeni):** `<` karakterini
+`<`'e kaçırıyor (`</script>` breakout'unu önlemek için — içerik
+admin/scraper etkisinde olduğundan XSS-bilinçli). Blog `Article`,
+Projeler/Yaptıklarımız `CreativeWork`, Hizmetler `Service`, ana sayfa
+`Organization` şemaları eklendi.
+
+**sitemap.xml/robots.txt (`apps/web/app/sitemap.ts`, `app/robots.ts`,
+yeni):** Cursor pagination'la tüm yayınlanmış içeriği (post/project/
+service/work) toplayıp `noindex` olanları filtreliyor. **Bulunan ve
+düzeltilen gerçek bug:** `app/sitemap.ts` Next.js'in `export const
+revalidate` konvansiyonu olmadan **yalnızca `next build` anında bir kez**
+üretiliyor — ilk test, API sunucusu henüz ayakta değilken alınan build'in
+statik boş snapshot'ını gösterdi (gerçek yayınlanmış içerik olmasına
+rağmen). `revalidate = 3600` eklenip API ayaktayken yeniden build edilince
+düzeldi; gerçek efektif pencere `lib/api.ts`'in kendi `revalidate: 60`
+fetch'iyle (Next.js ikisinin minimumunu alıyor) belirleniyor — kod
+yorumunda bu doğru şekilde not edildi, "bir saat" diye abartılmadı.
+`robots.txt`, `settings.seo.robotsIndexable`'a saygı duyuyor.
+
+**Veritabanı index'leri (12 şema dosyası, yeni migration
+`0007_magical_onslaught.sql`):** Postgres foreign key kolonlarını otomatik
+index'lemiyor — 15 yeni index eklendi (`contents.status`/`typeKey`,
+`sessions.family`/`userId`, taksonomi join tabloları, `media.ownerId`,
+scraper/data-pool tabloları, `service_details.categoryId`,
+`ai_requests.userId`), her biri ya servis kodunda doğrulanmış gerçek bir
+sorgu deseniyle ya da standart FK-index pratiğiyle gerekçelendirildi
+(spekülatif değil). `sudo -u postgres psql` ile tüm 15 index'in DB'de
+gerçekten oluştuğu doğrulandı.
+
+**apps/admin cilası:** Sidebar artık `"use client"` + `usePathname()` ile
+aktif linki gerçekten vurguluyor (önceden statik); Topbar kullanıcının baş
+harfiyle bir avatar dairesi gösteriyor.
+
+**İkinci bir gerçek build hatası bulundu ve düzeltildi:** `NODE_ENV=development`
+(`.env`'den `source` ile sızan) bir rebuild denemesinde otomatik-üretilen
+`/500` sayfasında alakasız bir Next.js iç hatasına (`<Html> should not be
+imported outside of pages/_document`) yol açtı — build log'undaki "You are
+using a non-standard NODE_ENV value" uyarısı kök nedeni işaret etti.
+`NODE_ENV=production` açıkça set edilerek çözüldü; gerçek bir kod/bağımlılık
+sorunu değildi.
+
+**Doğrulama (gerçek PostgreSQL + Redis + s3rver'a karşı, Docker olmadan,
+gerçek Chromium/Playwright ile uçtan uca):**
+- Login rate limiter: 5 yanlış şifre denemesi → her biri 401, 6. deneme →
+  429; doğru şifreyle login → email sayacının sıfırlandığı doğrulandı
+  (hemen ardından tekrar 5 yanlış deneme yapılabildiği görüldü)
+- `curl /sitemap.xml` — gerçek yayınlanmış 4 içerik (post/project/service/
+  work) doğru `lastmod`'la listede, bilinen bir `noindex` test yazısı
+  listede **yok**; `curl /robots.txt` — doğru `Allow`/`Sitemap` satırları
+- Gerçek bir blog detay sayfası (`/blog/2blog-nasil-calisir`) curl'lendi:
+  sticky/blur Header, 3 kolonlu Footer, doğru `Article` JSON-LD
+  (`headline`/`datePublished`/`dateModified` gerçek içerikle eşleşiyor),
+  OpenGraph/Twitter meta etiketleri
+- Playwright ile ana sayfa ve blog detay sayfası ekran görüntüsü alındı —
+  kurumsal/tech görsel dilin (temiz beyaz zemin, indigo vurgu, sıkı
+  tipografi, hover mikro-etkileşimleri) doğru render olduğu görsel olarak
+  doğrulandı
+- `sudo -u postgres psql` ile 15 yeni index'in gerçekten oluştuğu
+  (`pg_indexes`) doğrulandı
+- **apps/admin canlı test:** admin şifre hash'i geçici olarak bilinen bir
+  değere set edilip (test sonunda geri alınmadı çünkü zaten bir test
+  kullanıcısıydı — production seed'i etkilemiyor) gerçek login yapıldı;
+  Sidebar'da aktif sayfanın (`Panel`, `Medya`) doğru vurgulandığı, Topbar
+  avatarının kullanıcı baş harfini gösterdiği ekran görüntüleriyle
+  doğrulandı. Gerçek bir PNG `/medya`'ya yüklendi → grid'de `next/image`
+  ile (gerçek S3/s3rver backend'ine karşı) doğru render olduğu görüldü,
+  ardından silinip temizlendi.
+- `pnpm -r typecheck` → 14/14 paket başarılı; her üç Next.js app
+  (`web`/`admin`) + `core-media` gerçekten `pnpm build` ile production
+  build'i alındı
+
+**Kapsam dışı bırakılanlar:** Rate limiting yalnızca login'de — diğer
+public/yazma uçları (örn. `/media/upload`) için genel bir rate-limit
+middleware'i henüz yok (ayrı bir faz gerektirir, kapsamı login
+brute-force'a özel tutuldu). `next/image` yalnızca `apps/web`'in içerik
+kapak görselleri ve `apps/admin`'in medya kütüphanesinde — sitewide bir
+"tüm img'leri Image'e çevir" geçişi yapılmadı (SafeImage'in SSRF
+gerekçesi kasıtlı olarak yalnızca `coverImage` gibi serbest-URL alanlara
+uygulandı). Sitemap `MAX_PAGES=50` (sayfa başı 100 öğe) sınırıyla —
+gerçek ihtiyaç 5000 içeriği aşarsa büyütülmeli.
