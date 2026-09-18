@@ -60,7 +60,10 @@ registry'ye kendi domain modüllerinden kaydeder.
 - `GET/POST /api/v1/categories`, `GET/POST /api/v1/tags` — many-to-many
   ilişki (`content_categories`, `content_tags`). Seed script blog
   yazılarının konu kategorilerini idempotent şekilde oluşturur: Edebiyat,
-  Müzik, Girişim, E-Ticaret, Yapay Zeka.
+  Müzik, Girişim, E-Ticaret, Yapay Zeka. Admin'in İçerik formunda
+  checkbox olarak seçilebiliyor; `apps/web`'in `/blog` sayfasında
+  `?kategori=<slug>` ile filtrelenip pill/etiket olarak gösteriliyor.
+  Kategori oluşturma/düzenleme hâlâ admin UI'ında yok (yalnızca API).
 - Durum akışı: `DRAFT → REVIEW → APPROVED → SCHEDULED → PUBLISHED → ARCHIVED`
   (`packages/core-content-engine`'de tanımlı, geçersiz geçişler 400 döner).
 
@@ -245,7 +248,7 @@ hepsi `lib/api.ts` üzerinden Core API'nin `/*​/public` uçlarını çağırı
 alıyor (madde 24) — ikinci bir palet kopyası açmak yerine.
 
 - `/` — özet: son yazılar, öne çıkan hizmet/proje/işler (her biri `getX(..., 3)`)
-- `/blog`, `/blog/[slug]` — `typeKey=post`
+- `/blog`, `/blog/[slug]` — `typeKey=post`, `?kategori=<slug>` ile konu kategorisine göre filtrelenebilir
 - `/hizmetler`, `/hizmetler/[slug]` — kategori, özellikler, süreç, SSS, CTA
 - `/projelerimiz`, `/projelerimiz/[slug]` — teknolojiler, problem/çözüm/sonuç, demo/repo linkleri
 - `/yaptiklarimiz`, `/yaptiklarimiz/[slug]` — kategori, sonuç, bağlantılar

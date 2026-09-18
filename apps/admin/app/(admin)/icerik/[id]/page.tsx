@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { CONTENT_STATUSES, type Content } from "@2blog/types";
+import { CONTENT_STATUSES, type Category, type Content } from "@2blog/types";
 import { canTransitionContent } from "@2blog/core-content-engine";
 import { apiFetch, ApiError } from "../../../../lib/api";
 import ContentForm from "../ContentForm";
@@ -20,6 +20,7 @@ export default async function EditContentPage({ params }: Props) {
     if (error instanceof ApiError && error.status === 404) notFound();
     throw error;
   }
+  const categories = await apiFetch<Category[]>("/categories");
 
   const boundUpdate = updateContentAction.bind(null, id);
   const nextStatuses = CONTENT_STATUSES.filter((status) => canTransitionContent(content.status, status));
@@ -35,7 +36,7 @@ export default async function EditContentPage({ params }: Props) {
         deleteAction={deleteContentAction.bind(null, id)}
       />
 
-      <ContentForm action={boundUpdate} initial={content} submitLabel="Kaydet" />
+      <ContentForm action={boundUpdate} initial={content} categories={categories} submitLabel="Kaydet" />
     </div>
   );
 }

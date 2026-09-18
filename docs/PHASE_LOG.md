@@ -952,3 +952,67 @@ tablosu yok (Works emsaliyle aynı bilinçli karar). Yüklenen/self-hosted
 HTML/JS araç (admin'in kendi kodunu yükleyip barındırması) kapsam
 dışı — yalnızca harici bir URL'i iframe'leme; bu, kullanıcı
 netleştirme sorusunda üç seçenekten en dar kapsamlısı olarak seçildi.
+
+## Blog kategori atama UI'ı (tamamlandı)
+
+Bir önceki fazda 5 blog kategorisi (Edebiyat/Müzik/Girişim/E-Ticaret/
+Yapay Zeka) seed edildi ama **gerçek bir eksik fark edildi**: Core API
+`categoryIds`'i zaten destekliyordu (`packages/validation/src/content.ts`,
+`ContentService.syncTaxonomies`, PHASE 6/7'den beri var) ama admin'in
+İçerik formunda (`ContentForm.tsx`) hiç kategori seçici yoktu ve
+`apps/web`'in `/blog` sayfasında kategoriye göre filtreleme/gösterme
+hiç yoktu — kategoriler DB'de vardı ama yalnızca ham API çağrısıyla
+atanabiliyordu, kullanıcı arayüzünden değil.
+
+**apps/admin (`icerik/ContentForm.tsx`):** Kategori checkbox listesi
+eklendi — `yeni`/`[id]` sayfaları artık `GET /categories`'i çağırıp
+`ContentForm`'a prop olarak geçiriyor, `initial.categories`'ten
+mevcut seçim önceden işaretleniyor. `actions.ts`'teki
+`parseFormFields` artık `categoryIds`'i **her zaman bir dizi olarak**
+gönderiyor (`formData.getAll(...)`, hatta boşsa `[]`) — `ContentService.
+update`'in `categoryIds` alanını yalnızca *varsa* senkronize etmesi
+(`content.service.ts`'teki truthy-check) nedeniyle, anahtarı hiç
+göndermemek "değiştirme" anlamına geliyor ama boş bir dizi göndermek
+(JS'te dizi her zaman truthy) "tümünü kaldır" anlamına geliyor — bu
+ayrımı doğru kullanmak formun her checkbox'ı kaldırıldığında
+kategorileri gerçekten temizleyebilmesi için gerekliydi.
+
+**apps/web (`/blog`, `/blog/[slug]`):** `lib/api.ts`'e `getCategories()`
+eklendi, `getPosts` artık opsiyonel bir `categoryId` parametresi kabul
+ediyor. `/blog` sayfası `?kategori=<slug>` query param'ını okuyup
+kategori listesinden eşleşen id'yi buluyor (slug→id çözümü sayfada,
+API hâlâ yalnızca id ile filtreliyor) — üstte "Tümü" + her kategori
+için bir pill/link satırı, aktif olan vurgulu. Detay sayfasında
+yazının kategorileri başlığın üstünde tıklanabilir etiketler olarak
+render oluyor, her biri `/blog?kategori=<slug>`'a bağlanıyor.
+
+**Doğrulama (gerçek PostgreSQL + Redis + s3rver'a karşı, Docker
+olmadan):**
+- API ile gerçek bir post oluşturup `categoryIds` ile "Yapay Zeka"
+  kategorisine atadım, yayınladım
+- Playwright ile admin İçerik düzenleme sayfasına gittim: "Yapay Zeka"
+  checkbox'ının **önceden işaretli** geldiğini doğruladım, "Edebiyat"ı
+  da işaretleyip Kaydet'e bastım — API'den çektiğimde ikisinin de
+  gerçekten kaydedildiğini doğruladım (ekran görüntüsü alındı)
+- Test yazısını tek kategoriye (Yapay Zeka) geri döndürüp `apps/web`'i
+  build edip başlattım: `/blog` filtresiz tüm yazıları + kategori
+  pill'lerini gösterdi; `/blog?kategori=yapay-zeka` yazıyı gösterdi;
+  `/blog?kategori=muzik` yazıyı **göstermedi** ve "Müzik kategorisinde
+  henüz yayınlanmış yazı yok" mesajını + doğru vurgulanmış "Müzik"
+  pill'ini render etti (curl ile HTML'i doğrudan inceleyerek
+  doğrulandı); detay sayfasındaki "Yapay Zeka" etiketinin doğru
+  `/blog?kategori=yapay-zeka` linkine sahip olduğu doğrulandı
+- `pnpm -r typecheck` → 14/14 paket başarılı; `apps/web`/`apps/admin`
+  gerçekten production build aldı (`/blog` artık `searchParams`
+  okuduğu için statikten dinamik render'a geçti — beklenen, doğru
+  davranış)
+- Test verisi (oluşturulan yazı) temizlendi; `SKIP_BUCKET_POLICY_FOR_TEST`
+  bypass'ı geri alındı ve `@2blog/core-media` yeniden build edildi
+
+**Kapsam dışı bırakılanlar:** Kategori yönetimi (oluştur/düzenle/sil)
+admin'de hâlâ yok — yalnızca API'de `GET/POST /categories` var, `POST`
+da `CONTENT_EDIT` istiyor ama admin UI'ı yok (yeni bir kategori eklemek
+için hâlâ ham API çağrısı gerekiyor). Diğer content type'lar
+(Project/Service/Work/Tool) kendi ayrı taksonomilerini kullandığından
+(`service_categories` gibi) bu değişiklik yalnızca `post` tipini,
+yani İçerik formunu kapsıyor.

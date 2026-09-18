@@ -22,6 +22,11 @@ function parseFormFields(formData: FormData) {
     seoDescription: (formData.get("seoDescription") as string) || undefined,
     canonicalUrl: (formData.get("canonicalUrl") as string) || undefined,
     noindex: formData.get("noindex") === "on",
+    // Always an array (possibly empty) so unchecking every box actually
+    // clears categories on update — ContentService.update only syncs when
+    // categoryIds is present at all (content.service.ts truthy-check), and
+    // an empty array is truthy in JS, unlike an omitted key.
+    categoryIds: formData.getAll("categoryIds") as string[],
   };
 }
 

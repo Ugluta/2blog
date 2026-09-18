@@ -1,20 +1,22 @@
 "use client";
 
 import { useActionState } from "react";
-import type { Content } from "@2blog/types";
+import type { Category, Content } from "@2blog/types";
 import type { ContentFormState } from "./actions";
 
 interface Props {
   action: (state: ContentFormState, formData: FormData) => Promise<ContentFormState>;
   initial?: Content;
+  categories: Category[];
   submitLabel: string;
 }
 
 const initialState: ContentFormState = {};
 
-export default function ContentForm({ action, initial, submitLabel }: Props) {
+export default function ContentForm({ action, initial, categories, submitLabel }: Props) {
   const [state, formAction, pending] = useActionState(action, initialState);
   const fieldError = (name: string) => state.fieldErrors?.[name]?.[0];
+  const selectedCategoryIds = new Set(initial?.categories.map((category) => category.id) ?? []);
 
   return (
     <form action={formAction} className="max-w-2xl space-y-5">
@@ -51,6 +53,28 @@ export default function ContentForm({ action, initial, submitLabel }: Props) {
         <label htmlFor="coverImage">Kapak görseli URL</label>
         <input id="coverImage" name="coverImage" type="url" defaultValue={initial?.coverImage ?? undefined} className="w-full" />
       </div>
+
+      <fieldset className="rounded-md border border-border p-4">
+        <legend className="px-1 text-sm font-medium">Kategoriler</legend>
+        {categories.length === 0 ? (
+          <p className="text-sm text-foreground/60">Henüz kategori yok.</p>
+        ) : (
+          <div className="flex flex-wrap gap-x-4 gap-y-2">
+            {categories.map((category) => (
+              <label key={category.id} className="flex items-center gap-2 text-sm font-normal">
+                <input
+                  type="checkbox"
+                  name="categoryIds"
+                  value={category.id}
+                  defaultChecked={selectedCategoryIds.has(category.id)}
+                  className="w-auto"
+                />
+                {category.name}
+              </label>
+            ))}
+          </div>
+        )}
+      </fieldset>
 
       <fieldset className="rounded-md border border-border p-4">
         <legend className="px-1 text-sm font-medium">SEO</legend>

@@ -1,4 +1,4 @@
-import type { ApiSuccess, Content, CursorPage, GeneralSettings, MenuItem, Project, SeoSettings, Service, SocialSettings, Tool, Work } from "@2blog/types";
+import type { ApiSuccess, Category, Content, CursorPage, GeneralSettings, MenuItem, Project, SeoSettings, Service, SocialSettings, Tool, Work } from "@2blog/types";
 
 const API_URL = process.env.API_INTERNAL_URL ?? "http://localhost:4000";
 
@@ -39,14 +39,19 @@ export async function getSeoSettings(): Promise<SeoSettings> {
   return (await apiGet<SeoSettings>("/settings/seo", 300)) ?? { robotsIndexable: true };
 }
 
-export async function getPosts(cursor?: string, limit = 20): Promise<CursorPage<Content>> {
+export async function getPosts(cursor?: string, limit = 20, categoryId?: string): Promise<CursorPage<Content>> {
   const params = new URLSearchParams({ typeKey: "post", limit: String(limit) });
   if (cursor) params.set("cursor", cursor);
+  if (categoryId) params.set("categoryId", categoryId);
   return (await apiGet<CursorPage<Content>>(`/content/public?${params}`, 60)) ?? emptyPage();
 }
 
 export async function getPostBySlug(slug: string): Promise<Content | null> {
   return apiGet<Content>(`/content/public/${encodeURIComponent(slug)}`, 60);
+}
+
+export async function getCategories(): Promise<Category[]> {
+  return (await apiGet<Category[]>("/categories", 300)) ?? [];
 }
 
 export async function getProjects(cursor?: string, limit = 20): Promise<CursorPage<Project>> {

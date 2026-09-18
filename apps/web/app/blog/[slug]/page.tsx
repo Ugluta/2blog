@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPostBySlug } from "../../../lib/api";
 import { SafeImage } from "../../../components/SafeImage";
@@ -47,6 +48,19 @@ export default async function PostPage({ params }: Props) {
     <main className="mx-auto max-w-3xl px-4 py-16">
       <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScriptProps(jsonLd)} />
       <article>
+        {post.categories.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-x-3 gap-y-1">
+            {post.categories.map((category) => (
+              <Link
+                key={category.id}
+                href={`/blog?kategori=${category.slug}`}
+                className="text-sm font-semibold uppercase tracking-wide text-primary hover:underline"
+              >
+                {category.name}
+              </Link>
+            ))}
+          </div>
+        )}
         <h1 className="text-4xl font-bold tracking-tight">{post.title}</h1>
         {post.publishedAt ? (
           <p className="mt-3 text-sm text-foreground/60">{new Date(post.publishedAt).toLocaleDateString("tr-TR")}</p>
