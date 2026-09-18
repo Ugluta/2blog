@@ -1,0 +1,58 @@
+name: Deploy
+
+# Pushes the current branch to the VPS over SSH and rebuilds the Docker
+# Compose stack there (infrastructure/docker-compose.yml). No container
+# registry involved — images are built on the VPS itself, same as a
+# developer would run `docker compose up -d --build` by hand.
+#
+# Required repo secrets (Settings → Secrets and variables → Actions):
+#   DEPLOY_HOST       VPS IP or hostname
+#   DEPLOY_USER       SSH user (a non-root deploy user in the `docker` group)
+#   DEPLOY_SSH_KEY    private key matching a public key in that user's
+#                      ~/.ssh/authorized_keys on the VPS
+#   DEPLOY_PORT       optional, defaults to 22
+# Optional repo variable (Settings → Secrets and variables → Actions → Variables):
+#   DEPLOY_PATH       where the repo lives on the VPS, defaults to ~/2blog
+#
+# See docs/DEPLOYMENT.md for the one-time VPS setup this assumes.
+
+on:
+  push:
+    branches: [claude/amazing-heisenberg-i22b6b]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Load deploy SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+
+      - name: Trust the VPS host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p "${{ secrets.DEPLOY_PORT || '22' }}" -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Build + deploy on the VPS
+        env:
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '~/2blog' }}
+        run: |
+          ssh -p "${{ secrets.DEPLOY_PORT || '22' }}" "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "
+            set -euo pipefail
+            cd '$DEPLOY_PATH'
+            git fetch origin
+            git reset --hard 'origin/${{ github.ref_name }}'
+            set -a; source .env; set +a
+            docker compose -f infrastructure/docker-compose.yml build
+            docker compose -f infrastructure/docker-compose.yml up -d
+            docker compose -f infrastructure/docker-compose.yml exec -T api pnpm --filter @2blog/core-database migrate
+            docker image prune -f
+          "
+
+      - name: Health check
+        continue-on-error: true
+        run: |
+          sleep 5
+          curl -fsS "http://${{ secrets.DEPLOY_HOST }}:8080/api/v1/health" && echo "API up" || echo "::warning::Health check failed — deploy step succeeded, but /api/v1/health didn't respond. Check the VPS manually."

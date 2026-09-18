@@ -15,6 +15,11 @@ WORKDIR /app
 COPY --from=pruner /app/out/json/ .
 RUN pnpm install --frozen-lockfile
 COPY --from=pruner /app/out/full/ .
+# NEXT_PUBLIC_* vars are inlined into the bundle by `next build` itself (server
+# code included — sitemap.ts/robots.ts/generateMetadata read it), so it must
+# be present as a build arg, not just a runtime env_file entry.
+ARG NEXT_PUBLIC_SITE_URL
+ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
 RUN pnpm turbo run build --filter=@2blog/web
 
 FROM base AS runner

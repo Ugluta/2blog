@@ -359,6 +359,15 @@ VPS üzerinde Docker Compose + Caddy (bkz. `infrastructure/docker-compose.yml`,
 Vercel'e değil, aynı Compose ağındaki container'lara alınır — gerekçe
 `docs/ARCHITECTURE.md` madde 19'da.
 
+Adım adım VPS kurulumu, GitHub Actions üzerinden otomatik deploy pipeline'ı
+ve domain eklendiğinde yapılacak değişiklikler için: **[`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md)**.
+
+Kısaca: `git push` → `.github/workflows/deploy.yml` VPS'e SSH ile bağlanıp
+`docker compose build && up -d` + migration çalıştırıyor. Şu an domain yok,
+Caddy IP üzerinden üç ayrı portta düz HTTP sunuyor (web:80, api:8080,
+admin:8081) — `postgres`/`redis`/`minio` yalnızca `127.0.0.1`'e bağlı,
+dışarıdan erişilemez.
+
 ```bash
 docker compose -f infrastructure/docker-compose.yml up -d --build
 ```

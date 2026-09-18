@@ -1,35 +1,70 @@
-# Production örneği — {$WEB_DOMAIN} / {$ADMIN_DOMAIN} / {$API_DOMAIN} ortam
-# değişkenlerini gerçek alan adlarıyla (örn. blog.example.com) değiştirin.
-# Caddy bu domainler için otomatik HTTPS/TLS sertifikası sağlar.
+# IP-only mod — henüz bir domain yok, bu yüzden Caddy domain bazlı routing +
+# otomatik HTTPS yerine düz HTTP'yi üç ayrı portta sunuyor: web:80,
+# admin:8081, api:8080 (docker-compose.yml'deki caddy servisinin port
+# mapping'iyle birebir). Bir domain alındığında bu dosyayı aşağıdaki
+# yorumlanmış domain-bazlı bloklarla değiştirin ve docker-compose.yml'de
+# caddy servisinin portlarını "80:80"/"443:443"'e geri döndürün.
 
-{$WEB_DOMAIN:web.localhost} {
+:80 {
 	reverse_proxy web:3000
 	encode gzip zstd
 	header {
-		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "strict-origin-when-cross-origin"
 		X-Frame-Options "DENY"
 	}
 }
 
-{$ADMIN_DOMAIN:admin.localhost} {
+:8081 {
 	reverse_proxy admin:3001
 	encode gzip zstd
 	header {
-		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "strict-origin-when-cross-origin"
 		X-Frame-Options "DENY"
 	}
 }
 
-{$API_DOMAIN:api.localhost} {
+:8080 {
 	reverse_proxy api:4000
 	encode gzip zstd
 	header {
-		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "strict-origin-when-cross-origin"
 	}
 }
+
+# ---- Domain alındığında bunun yerine (madde: Caddy otomatik HTTPS/TLS
+# sertifikası sağlar) ----
+#
+# {$WEB_DOMAIN} {
+# 	reverse_proxy web:3000
+# 	encode gzip zstd
+# 	header {
+# 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+# 		X-Content-Type-Options "nosniff"
+# 		Referrer-Policy "strict-origin-when-cross-origin"
+# 		X-Frame-Options "DENY"
+# 	}
+# }
+#
+# {$ADMIN_DOMAIN} {
+# 	reverse_proxy admin:3001
+# 	encode gzip zstd
+# 	header {
+# 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+# 		X-Content-Type-Options "nosniff"
+# 		Referrer-Policy "strict-origin-when-cross-origin"
+# 		X-Frame-Options "DENY"
+# 	}
+# }
+#
+# {$API_DOMAIN} {
+# 	reverse_proxy api:4000
+# 	encode gzip zstd
+# 	header {
+# 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+# 		X-Content-Type-Options "nosniff"
+# 		Referrer-Policy "strict-origin-when-cross-origin"
+# 	}
+# }
