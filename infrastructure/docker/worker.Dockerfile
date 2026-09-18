@@ -15,6 +15,12 @@ WORKDIR /app
 COPY --from=pruner /app/out/json/ .
 RUN pnpm install --frozen-lockfile
 COPY --from=pruner /app/out/full/ .
+# turbo prune --docker doesn't include loose root files outside any
+# workspace package — every package's tsconfig.json extends this one
+# via a relative "../../tsconfig.base.json", so without it tsc fails
+# with TS5083 "Cannot read file '/app/tsconfig.base.json'" (hit on a
+# real deploy attempt, reproduced by inspecting out/full/ directly).
+COPY --from=pruner /app/tsconfig.base.json .
 RUN pnpm turbo run build --filter=@2blog/worker
 
 FROM base AS runner

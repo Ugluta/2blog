@@ -1218,3 +1218,67 @@ sayfaları, ve `login-rate-limiter.service.ts` gibi Redis'e bağımlı
 mantık kapsam dışı — bunlar için gerçek entegrasyon testleri (ioredis-mock
 ya da gerçek bir test container'ı gerektiren) ayrı, daha büyük bir faz
 gerektirir. `apps/*`'in hiçbirinde hâlâ test yok.
+
+## İlk gerçek VPS deploy denemesi — iki gerçek Docker build bug'ı (tamamlandı)
+
+Kullanıcı gerçek bir VPS'e (`2.27.101.227`) erişim sağlayıp
+`docs/DEPLOYMENT.md`'yi adım adım uyguladı — bu, bu oturumda yazılan
+deploy altyapısının **ilk gerçek, canlı** denemesiydi (önceki
+doğrulamalar `docker compose config` ile interpolation kontrolü ve
+GitHub Actions'ın `verify` job'uyla sınırlıydı, gerçek bir `docker
+build`/`docker run` hiç tetiklenmemişti — bu sandbox'ta Docker
+daemon'ı yok). İki gerçek, daha önce hiç yakalanmamış bug bulundu:
+
+**Bug 1 — `docker compose` komutları `.env`'i bulamıyordu:**
+`docker compose -f infrastructure/docker-compose.yml build` (adım 4'te
+elle, `--env-file` olmadan) `POSTGRES_PASSWORD`/`STORAGE_ACCESS_KEY`/
+`NEXT_PUBLIC_SITE_URL` için "missing a value" hatasıyla başarısız oldu
+— `.env` doğru yerde ve doğru doluydu. Kök neden: `-f infrastructure/
+docker-compose.yml` ile çağrıldığında Compose'un proje dizini
+`infrastructure/` oluyor, `.env`'i orada arıyor. `.github/workflows/
+deploy.yml` bu hatayı hiç almıyordu çünkü zaten `source .env` ile
+değişkenleri shell'e export ediyordu (Compose shell ortam
+değişkenlerini de kontrol ediyor) — bunu bu ortamda tam dolu bir test
+`.env`'iyle doğruladım, gerçekten çalışıyor. Düzeltme yalnızca
+`docs/DEPLOYMENT.md`'nin elle çalıştırılan komutlarına ve
+`README.md`'nin local-dev komutuna `--env-file .env` eklemekti.
+
+**Bug 2 — Docker build'in kendisi `tsconfig.base.json` bulamıyordu:**
+`--env-file` düzeltmesinden sonra build denendiğinde, `@2blog/types`
+paketinin build'i `error TS5083: Cannot read file '/app/tsconfig.base.json'`
+ile başarısız oldu, bu da web/api/admin/worker'ın hepsini
+etkiliyordu. Kök neden: her paketin `tsconfig.json`'ı repo kökündeki
+`tsconfig.base.json`'ı `"../../tsconfig.base.json"` göreli yoluyla
+`extends` ediyor, ama `turbo prune --docker`'ın ürettiği `out/full/`
+dizini yalnızca workspace paketlerinin kendi klasörlerini + kök
+`package.json`/`pnpm-workspace.yaml`/`turbo.json`'ı içeriyor — herhangi
+bir pakete ait olmayan, kök dizindeki başıboş dosyaları (tam olarak
+`tsconfig.base.json` gibi) dahil etmiyor. Bu, `turbo prune`'un
+belgelenmemiş ama gerçek bir davranışı — bu ortamda `npx turbo prune
+@2blog/web --docker` çalıştırıp `out/full/`'ın içeriğini doğrudan
+inceleyerek doğruladım (`tsconfig.base.json` gerçekten yok). Düzeltme:
+4 Dockerfile'ın hepsine (`api`/`web`/`admin`/`worker`) `COPY
+--from=pruner /app/out/full/ .`'den hemen sonra `COPY --from=pruner
+/app/tsconfig.base.json .` eklendi — pruner stage'i `COPY . .` ile
+reponun tamamını kopyaladığı için dosya orada zaten mevcut, yalnızca
+`out/full/`'a dahil edilmiyordu.
+
+**Doğrulama:** Bu sandbox'ta gerçek Docker daemon'ı olmadığından,
+Dockerfile'ların `installer` stage'ini elle adım adım simüle ettim:
+`npx turbo prune @2blog/web --docker` (ve ayrıca `@2blog/api` için)
+çalıştırıp `out/json/`'ı kopyalayıp `pnpm install --frozen-lockfile`,
+sonra `out/full/` + `tsconfig.base.json`'ı kopyalayıp `pnpm turbo run
+build --filter=@2blog/web` (ve `@2blog/api`) çalıştırdım — ikisi de
+gerçekten başarıyla tamamlandı (web: tüm route'lar dahil `next build`
+başarılı; api: `nest build` dahil 11/11 task başarılı). Bu, gerçek
+Docker build'inin yapacağı adımların birebir aynısı (yalnızca Docker
+katmanları yerine düz dizin kopyalama kullanıldı) — gerçek bir
+`docker build` çalıştırmasının eşdeğeri, iddia değil.
+
+**Kapsam:** Bu iki bug, deploy altyapısının bu oturumda **hiç
+tetiklenmemiş**, yalnızca statik olarak (YAML sözdizimi, `docker
+compose config` ile interpolation) doğrulanmış kısımlarındaydı — asıl
+`docker build`/`docker run` çalıştırma yolu. Bu, canlı bir VPS'e karşı
+gerçek bir deploy denemesinin, ne kadar dikkatli statik doğrulama
+yapılırsa yapılsın bulamayacağı sınıfta bir gerçek doğrulama
+sağladığının somut kanıtı.
