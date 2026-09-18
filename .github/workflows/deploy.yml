@@ -1,9 +1,11 @@
 name: Deploy
 
-# Pushes the current branch to the VPS over SSH and rebuilds the Docker
-# Compose stack there (infrastructure/docker-compose.yml). No container
-# registry involved — images are built on the VPS itself, same as a
-# developer would run `docker compose up -d --build` by hand.
+# `verify` runs pnpm -r typecheck first — a push that fails it never
+# reaches the `deploy` job. `deploy` pushes the current branch to the
+# VPS over SSH and rebuilds the Docker Compose stack there
+# (infrastructure/docker-compose.yml). No container registry involved —
+# images are built on the VPS itself, same as a developer would run
+# `docker compose up -d --build` by hand.
 #
 # Required repo secrets (Settings → Secrets and variables → Actions):
 #   DEPLOY_HOST       VPS IP or hostname
@@ -22,7 +24,30 @@ on:
   workflow_dispatch:
 
 jobs:
+  verify:
+    # Gates the deploy job below — a push that fails typecheck never
+    # reaches the VPS. No lint/test script exists in this repo yet
+    # (pnpm -r typecheck is the strongest automated check there is);
+    # full `next build` isn't run here since it needs production env
+    # vars (NEXT_PUBLIC_SITE_URL etc.) that only live in the VPS's own
+    # .env, not in CI.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm -r typecheck
+
   deploy:
+    needs: verify
     runs-on: ubuntu-latest
     steps:
       - name: Load deploy SSH key

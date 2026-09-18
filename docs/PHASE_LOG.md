@@ -1042,3 +1042,29 @@ denedim (curl ile) → 409 döndüğünü doğruladım (duplicate slug guard'ı
 zaten çalışıyordu, bu fazda dokunulmadı) → test kategorisini temizledim
 (DELETE endpoint'i olmadığı için doğrudan SQL ile). `pnpm -r typecheck`
 → 14/14 paket başarılı.
+
+## Deploy pipeline'a typecheck kapısı (tamamlandı)
+
+Kod incelemesinde bulunan bir gerçek eksik: `.github/workflows/deploy.yml`
+doğrudan build+deploy yapıyordu — bozuk bir kod push edilirse hiçbir
+şey onu durdurmadan VPS'e gidiyordu. Yeni bir `verify` job'ı eklendi
+(`actions/checkout` → `pnpm/action-setup` → `actions/setup-node` (pnpm
+cache'li) → `pnpm install --frozen-lockfile` → `pnpm -r typecheck`);
+`deploy` job'ı artık `needs: verify` ile yalnızca bu geçerse çalışıyor.
+
+**Bilinçli kapsam kararı:** Repoda lint/test script'i yok (bilinçli
+bir PHASE 1 kararı, PHASE_LOG'da not edildi), bu yüzden `verify`
+yalnızca `typecheck` çalıştırıyor — bu, şu an var olan en güçlü
+otomatik kontrol. `next build`'i CI'da çalıştırmadım çünkü production
+build'i `NEXT_PUBLIC_SITE_URL` gibi yalnızca VPS'in kendi `.env`'inde
+yaşayan gerçek değerlere ihtiyaç duyuyor (`infrastructure/docker-
+compose.yml`'in web servisi zaten bunu VPS'te build-arg olarak
+kullanıyor) — CI'da sahte bir değerle build almak yalnızca gerçek
+olmayan bir doğrulama olurdu.
+
+**Doğrulama:** `pnpm install --frozen-lockfile` + `pnpm -r typecheck`'i
+bu ortamda gerçekten çalıştırıp CI'nın çalıştıracağı adımların aynısının
+başarılı olduğunu doğruladım; workflow YAML'ının `python3 -c "import
+yaml; yaml.safe_load(...)"` ile geçerli olduğunu doğruladım. Push
+sonrası gerçek workflow çalıştırmasının sonucu GitHub'da doğrulandı
+(bkz. commit mesajı/PR).

@@ -127,9 +127,11 @@ Secret'lar eklendikten sonra ilk deploy'u tetiklemek için: GitHub → Actions
 `git push` bu branch'e otomatik olarak aynı pipeline'ı tetikler
 (`.github/workflows/deploy.yml`).
 
-Pipeline: VPS'e SSH ile bağlan → `git reset --hard` ile son commit'e geç →
-`docker compose build && up -d` → migration'ları uygula → `/api/v1/health`'i
-dışarıdan curl'le doğrula.
+Pipeline iki job'lı: önce `verify` (`pnpm -r typecheck` — hata varsa
+pipeline burada durur, VPS'e hiç dokunulmaz), sonra `deploy` (yalnızca
+`verify` geçerse çalışır): VPS'e SSH ile bağlan → `git reset --hard` ile
+son commit'e geç → `docker compose build && up -d` → migration'ları
+uygula → `/api/v1/health`'i dışarıdan curl'le doğrula.
 
 **Not:** `seed` pipeline'da otomatik çalışmıyor (yalnızca ilk kurulumda
 gerekli, adım 4'te elle çalıştırıldı) — script idempotent olduğu için
