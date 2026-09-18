@@ -186,6 +186,17 @@ gerek yok.
   (6379) veya minio (9000/9001) için de olursa aynı mantıkla
   `docker-compose.yml`'e benzer bir `_HOST_PORT` değişkeni eklenebilir
   (şu an yalnızca postgres için var, gerçek ihtiyaç çıkarsa genişletin).
+- **`Bind for 0.0.0.0:80 failed: port is already allocated`:** VPS
+  paylaşımlıysa (üzerinde 2blog dışında başka projeler/container'lar da
+  çalışıyorsa) 80 zaten kullanımda olabilir — `ss -tlnp | grep :80` ile
+  doğrulayın, kimin tuttuğuna bakın. **O container'a/projeye asla
+  dokunmayın** (kullanıcının başka bir canlı servisi olabilir). Bunun
+  yerine `.env`'e `CADDY_WEB_PORT=8082` (veya boşta başka bir port)
+  ekleyin, `NEXT_PUBLIC_SITE_URL`/`CORS_ORIGINS`'i de aynı portu
+  içerecek şekilde güncelleyin (`http://<VPS_IP>:8082`), sonra
+  `NEXT_PUBLIC_SITE_URL` build-time'da bundle'a gömüldüğü için
+  **web image'ını yeniden build edin** (`docker compose build web`),
+  sonra `up -d`.
 - **`docker compose exec api ...` "no such service" hatası verirse:** `up -d`
   henüz tamamlanmamış olabilir, `docker compose ps` ile `api`'nin `healthy`
   olduğunu doğrulayın.

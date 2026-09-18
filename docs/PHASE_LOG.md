@@ -1311,3 +1311,21 @@ host'tan dışarıdan `psql` ile bağlanmak isteyenler için bir
 kolaylık — uygulamanın kendisi hiç etkilenmiyor. `docker compose
 config` ile hem varsayılan (5432) hem override (5433) davranışı
 doğrulandı.
+
+**Bug 5 — VPS paylaşımlı çıktı, port 80 başka bir projede kullanılıyordu:**
+`postgres`/`redis`/`minio`/`api`/`admin`/`web`/`worker` hepsi sağlıklı
+ayağa kalktıktan sonra yalnızca `caddy` `Bind for 0.0.0.0:80 failed:
+port is already allocated` hatasıyla başarısız oldu. `docker ps -a` ile
+kontrol edilince bu sunucunun 2blog'a özel olmadığı, **"sesvizyon"
+adında 42 saattir çalışan, tamamen ayrı bir production stack'in**
+(kendi Caddy/Postgres/Redis/MinIO/Grafana/Prometheus'u) zaten burada
+çalıştığı ortaya çıktı — kullanıcı bunu doğruladı, kendi başka bir
+projesi. `sesvizyon-caddy-1` port 80/443'ü tutuyordu. **Bu container'a
+hiç dokunulmadı** — bilinçli olarak, başkasının (aynı kullanıcının
+başka bir) canlı servisine müdahale edilmedi. `ss -tlnp` ile tüm
+sunucudaki port kullanımı çıkarılıp 8080/8081'in gerçekten boş
+olduğu (yalnızca 80/443 çakıştığı) doğrulandı. `docker-compose.yml`'in
+`caddy` servisine `POSTGRES_HOST_PORT` ile aynı desende bir
+`CADDY_WEB_PORT` (varsayılan 80, override edilebilir) eklendi —
+Caddy'nin container İÇİNDEKİ `:80` dinlemesi hiç değişmiyor, yalnızca
+host'a açılan port taşınıyor, `docker compose config` ile doğrulandı.
