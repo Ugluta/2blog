@@ -1135,3 +1135,86 @@ production'da bazı bu header'ları edge'de set ediyordu
 (`infrastructure/caddy/Caddyfile`) — bu değişiklik savunma derinliği
 sağlıyor: yerel geliştirmede (Caddy yok) ve API'ye doğrudan erişilirse
 de aynı header'lar duruyor.
+
+## Otomatik test altyapısı (tamamlandı)
+
+Repo başından beri `pnpm test` script'i (`turbo run test`) vardı ama
+tek bir test dosyası, hatta kurulu bir test runner'ı bile yoktu — bu
+oturumdaki her doğrulama (PHASE_LOG'un her yerinde görüldüğü gibi)
+elle curl/Playwright ile yapıldı, hiçbiri repoya commit edilmedi.
+`vitest` seçildi (hızlı, native ESM/TS desteği, turborepo'yla iyi
+çalışıyor) ve daha önce bu oturumda **yalnızca elle test edilmiş**
+dört paketin gerçek mantığına gerçek unit testler yazıldı:
+
+- `packages/core-rbac` — `hasPermission`/`hasAnyPermission`/
+  `hasAllPermissions` (10 test): tam eşleşme, prefix/wildcard
+  eşleşmemesi, boş küme davranışları.
+- `packages/core-content-engine` — `canTransitionContent` (8 test):
+  **tüm** `(from, to)` çiftlerini `workflow.ts`'teki belgelenmiş
+  grafiğe karşı doğruluyor (6×6=36 kombinasyon tek testte), artı
+  DRAFT→PUBLISHED kısayolu, ARCHIVED'ın yalnızca DRAFT'a dönebilmesi,
+  bir durumun kendine geçememesi gibi PHASE 6/7'de yazılan iş
+  kurallarının ta kendisi.
+  `assertValidContentTransition`'ın doğru hata mesajıyla attığı da
+  ayrıca doğrulandı.
+- `packages/core-auth` — `parseDurationMs` (14 test: geçerli/geçersiz
+  format kombinasyonları) + `hashPassword`/`verifyPassword` (5 test,
+  **gerçek argon2id hashleme** — round-trip doğrulama, yanlış şifre
+  reddi, argon2id prefix kontrolü, aynı şifre için farklı salt/hash
+  üretimi, bozuk hash'e karşı throw yerine `false` dönmesi).
+- `packages/core-scraper-kit` — `assertPublicHttpUrl` (SSRF guard, 21
+  test): `isPrivateIPv4`/`isPrivateIPv6`'nın private/link-local/CGNAT/
+  multicast aralıklarının **her birini** (üst/alt sınırlarıyla birlikte,
+  örn. `172.16.0.0/12`'nin bir altı ve bir üstü) hem engellemesi hem
+  doğru aralık dışındakileri (gerçek public IP'ler: `8.8.8.8`, `1.1.1.1`)
+  geçirmesi; desteklenmeyen protokol, bozuk URL, IPv6 loopback/unique-
+  local/link-local. Testler literal IP adresleri kullanıyor
+  (`dns.lookup` bunları gerçek bir DNS sorgusu yapmadan yerel olarak
+  çözüyor) — bu sandbox'ta internet erişimi olmadan deterministik
+  çalışıyor.
+
+**Bulunan ve düzeltilen gerçek bug (yine CI grafiği ile ilgili, deploy
+pipeline'daki `pnpm -r typecheck` hatasının ikizi):** Test dosyaları
+da workspace paketlerini import ediyor (`workflow.test.ts` →
+`@2blog/types`) — `pnpm --filter X test` (turbo'nun `dependsOn:
+["^build"]` grafiğini atlayarak) doğrudan çalıştırıldığında, `dist/`
+klasörleri temizlenmiş bir ortamda **aynı şekilde** başarısız oldu
+(`Failed to resolve entry for package "@2blog/types"`). Doğru komut
+`pnpm test` (root script → turbo) — bunu bu ortamda tüm `dist/`
+klasörlerini silip yeniden üreterek doğruladım.
+
+**Bulunan ve düzeltilen ikinci gerçek bug:** 4 paketin `tsconfig.json`'ı
+`"include": ["src"]` diyordu, test dosyalarını hariç tutmuyordu —
+`pnpm build`'in kullandığı `tsc -p tsconfig.json` yeni test
+dosyalarını da derleyip **`dist/`'e test kodu sızdıracaktı**
+(`has-permission.test.js` gibi, published paket çıktısının parçası
+olarak). Düzeltme: her pakete `tsconfig.build.json` eklendi
+(`tsconfig.json`'ı extend edip `src/**/*.test.ts`'i hariç tutuyor),
+`build` script'i bunu kullanacak şekilde güncellendi; `typecheck`
+script'i hâlâ varsayılan `tsconfig.json`'ı kullanıyor (test
+dosyalarının type-check edilmesi isteniyor — vitest'in kendisi
+runtime'da tip kontrolü yapmıyor, yalnızca transpile ediyor, bu yüzden
+tip hatalarını yakalayan tek şey `tsc --noEmit`). Temiz bir `pnpm
+build` sonrası `find ... -iname "*test*"` ile `dist/`'te hiç test
+dosyası olmadığı doğrulandı.
+
+**CI:** `.github/workflows/deploy.yml`'in `verify` job'ına `pnpm test`
+adımı eklendi, `pnpm typecheck`'ten hemen sonra — ikisi de geçmeden
+`deploy` job'ı hâlâ çalışmıyor (`needs: verify` zaten mevcuttu).
+
+**Doğrulama:** Bu ortamda tam bir "temiz checkout" simülasyonu
+yaptım — tüm `dist/`/`.next/` klasörlerini sildim, `pnpm install
+--frozen-lockfile` + `pnpm typecheck` + `pnpm test`'i CI'nın
+çalıştıracağı sırayla çalıştırdım: 24/24 typecheck task ve 14/14 test
+task (58 gerçek assertion, 4 test dosyası) başarılı. Workflow YAML'ı
+`python3 -c "import yaml; yaml.safe_load(...)"` ile geçerli olduğu
+doğrulandı.
+
+**Bilinçli kapsam kararı:** Kapsam kasıtlı olarak dar tutuldu — önceki
+fazların **yalnızca elle** doğrulanmış, saf/deterministik mantığına
+(RBAC, workflow grafiği, SSRF guard, parola/süre parse'ı) odaklanıldı.
+NestJS controller'ları/servisleri (gerçek DB/Redis'e bağımlı), Next.js
+sayfaları, ve `login-rate-limiter.service.ts` gibi Redis'e bağımlı
+mantık kapsam dışı — bunlar için gerçek entegrasyon testleri (ioredis-mock
+ya da gerçek bir test container'ı gerektiren) ayrı, daha büyük bir faz
+gerektirir. `apps/*`'in hiçbirinde hâlâ test yok.

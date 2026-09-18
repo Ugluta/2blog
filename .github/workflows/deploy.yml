@@ -1,8 +1,8 @@
 name: Deploy
 
-# `verify` runs pnpm -r typecheck first — a push that fails it never
-# reaches the `deploy` job. `deploy` pushes the current branch to the
-# VPS over SSH and rebuilds the Docker Compose stack there
+# `verify` runs typecheck + unit tests first — a push that fails either
+# never reaches the `deploy` job. `deploy` pushes the current branch to
+# the VPS over SSH and rebuilds the Docker Compose stack there
 # (infrastructure/docker-compose.yml). No container registry involved —
 # images are built on the VPS itself, same as a developer would run
 # `docker compose up -d --build` by hand.
@@ -25,25 +25,26 @@ on:
 
 jobs:
   verify:
-    # Gates the deploy job below — a push that fails typecheck never
-    # reaches the VPS. No lint/test script exists in this repo yet
-    # (typecheck is the strongest automated check there is); full
-    # `next build` isn't run here since it needs production env vars
-    # (NEXT_PUBLIC_SITE_URL etc.) that only live in the VPS's own .env,
-    # not in CI.
+    # Gates the deploy job below — a push that fails typecheck or tests
+    # never reaches the VPS. No lint script exists in this repo yet;
+    # full `next build` isn't run here since it needs production env
+    # vars (NEXT_PUBLIC_SITE_URL etc.) that only live in the VPS's own
+    # .env, not in CI.
     #
-    # Must be `pnpm typecheck` (the root script, which is `turbo run
-    # typecheck`), NOT `pnpm -r typecheck` — turbo.json declares
-    # typecheck as dependsOn: ["^build"], so turbo builds a package's
-    # workspace dependencies (e.g. @2blog/types) before typechecking
-    # anything that imports their compiled .d.ts output. Plain `pnpm -r`
-    # ignores that graph entirely and typechecks packages in whatever
-    # order it likes — it only "worked" in local testing throughout this
-    # project because `dist/` folders were already built from earlier,
-    # unrelated commands in the same working tree. A genuinely fresh
-    # checkout (this CI job, confirmed by an actual failed run) has no
-    # dist/ folders yet, so packages/core-auth (imports @2blog/types)
-    # failed with TS2307 "Cannot find module '@2blog/types'".
+    # Must be `pnpm typecheck` / `pnpm test` (the root scripts, both
+    # `turbo run ...`), NOT `pnpm -r typecheck` / `pnpm -r test` —
+    # turbo.json declares both as dependsOn: ["^build"], so turbo builds
+    # a package's workspace dependencies (e.g. @2blog/types) before
+    # typechecking or testing anything that imports their compiled
+    # .d.ts/.js output. Plain `pnpm -r` ignores that graph entirely and
+    # runs packages in whatever order it likes — it only "worked" in
+    # local testing throughout this project because `dist/` folders
+    # were already built from earlier, unrelated commands in the same
+    # working tree. A genuinely fresh checkout (this CI job, confirmed
+    # by an actual failed run) has no dist/ folders yet, so
+    # packages/core-auth (imports @2blog/types) failed with TS2307
+    # "Cannot find module '@2blog/types'" the same way a test file
+    # importing it would.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -58,6 +59,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm typecheck
+
+      - run: pnpm test
 
   deploy:
     needs: verify

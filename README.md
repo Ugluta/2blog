@@ -381,11 +381,32 @@ pnpm dev
 pnpm dev         # tüm apps (turbo)
 pnpm build       # tüm apps + packages
 pnpm typecheck   # tüm workspace
+pnpm test        # tüm workspace (vitest, dört pakette gerçek unit test var)
 pnpm lint        # tüm workspace
 pnpm db:generate # Drizzle migration dosyası üret (packages/core-database)
 pnpm db:migrate  # migration'ları uygula
 pnpm db:seed     # Core izinleri + SUPER_ADMIN rolü + (opsiyonel) ilk admin kullanıcı
 ```
+
+**Önemli:** `pnpm typecheck`/`pnpm test` kullanın, `pnpm -r typecheck`/
+`pnpm -r test` değil — ikincisi turbo'nun `dependsOn: ["^build"]`
+grafiğini atlar ve bir paket workspace bağımlılıklarının (`@2blog/types`
+gibi) derlenmiş çıktısını henüz build edilmemişse bulamaz. Bu, deploy
+pipeline'ının ilk çalıştırmasında gerçekten yakalanan bir bug'dı
+(`docs/PHASE_LOG.md`) — yerel geliştirmede genelde fark edilmiyor
+çünkü `dist/` klasörleri önceki komutlardan zaten var oluyor.
+
+## Testler
+
+`packages/core-rbac`, `core-content-engine`, `core-auth`,
+`core-scraper-kit` — bu oturumda yalnızca elle (curl/Playwright)
+doğrulanmış saf mantık için gerçek `vitest` unit testleri var (58
+assertion): RBAC izin kontrolü, content workflow geçiş grafiğinin tüm
+kombinasyonları, gerçek argon2id parola hash/verify, ve SSRF guard'ın
+private/link-local/CGNAT IP aralıkları (literal IP'lerle, gerçek DNS
+sorgusu gerekmeden). `apps/*` ve Redis/DB'ye bağımlı servisler
+(örn. login rate limiter) kapsam dışı — ayrı bir entegrasyon test
+fazı gerektiriyor.
 
 ## Production Deployment
 
