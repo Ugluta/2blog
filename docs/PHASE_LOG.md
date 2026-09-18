@@ -1049,8 +1049,8 @@ Kod incelemesinde bulunan bir gerçek eksik: `.github/workflows/deploy.yml`
 doğrudan build+deploy yapıyordu — bozuk bir kod push edilirse hiçbir
 şey onu durdurmadan VPS'e gidiyordu. Yeni bir `verify` job'ı eklendi
 (`actions/checkout` → `pnpm/action-setup` → `actions/setup-node` (pnpm
-cache'li) → `pnpm install --frozen-lockfile` → `pnpm -r typecheck`);
-`deploy` job'ı artık `needs: verify` ile yalnızca bu geçerse çalışıyor.
+cache'li) → `pnpm install --frozen-lockfile` → typecheck); `deploy`
+job'ı artık `needs: verify` ile yalnızca bu geçerse çalışıyor.
 
 **Bilinçli kapsam kararı:** Repoda lint/test script'i yok (bilinçli
 bir PHASE 1 kararı, PHASE_LOG'da not edildi), bu yüzden `verify`
@@ -1062,9 +1062,31 @@ compose.yml`'in web servisi zaten bunu VPS'te build-arg olarak
 kullanıyor) — CI'da sahte bir değerle build almak yalnızca gerçek
 olmayan bir doğrulama olurdu.
 
-**Doğrulama:** `pnpm install --frozen-lockfile` + `pnpm -r typecheck`'i
-bu ortamda gerçekten çalıştırıp CI'nın çalıştıracağı adımların aynısının
-başarılı olduğunu doğruladım; workflow YAML'ının `python3 -c "import
-yaml; yaml.safe_load(...)"` ile geçerli olduğunu doğruladım. Push
-sonrası gerçek workflow çalıştırmasının sonucu GitHub'da doğrulandı
-(bkz. commit mesajı/PR).
+**Bulunan ve düzeltilen gerçek bug — ilk push'ta CI'nın kendisi
+yakaladı:** İlk commit `pnpm -r typecheck` kullanıyordu ve gerçek
+GitHub Actions çalıştırmasında **başarısız oldu** (`packages/core-auth`:
+"Cannot find module '@2blog/types'"). Kök neden: root `package.json`'ın
+`typecheck` script'i aslında `turbo run typecheck` — ve `turbo.json`
+`typecheck`'i `dependsOn: ["^build"]` olarak tanımlıyor, yani turbo bir
+paketi typecheck etmeden önce onun workspace bağımlılıklarını (örn.
+`@2blog/types`) build edip `dist/*.d.ts` üretiyor. `pnpm -r typecheck`
+bu bağımlılık grafiğini tamamen görmezden gelip paketleri turbo'nun
+sırasına değil kendi sırasına göre typecheck ediyor. Bu proje boyunca
+onlarca kez elle çalıştırdığım `pnpm -r typecheck` hep "başarılı"
+görünüyordu çünkü çalışma dizininde önceki (ilgisiz) komutlardan kalma
+`dist/` klasörleri zaten vardı — gerçekten temiz bir checkout'ta
+(GitHub Actions runner'ı, ya da bu ortamda tüm `dist/` klasörlerini
+elle silip yeniden denediğimde) bug gerçekten üretiliyor. Düzeltme:
+workflow'da `pnpm -r typecheck` yerine `pnpm typecheck` (root
+script → turbo → doğru sıra).
+
+**Doğrulama:** Bu ortamda tüm `dist/` klasörlerini silip temiz bir
+checkout simüle ettim → `pnpm -r typecheck` gerçekten aynı hatayla
+başarısız oldu (CI'daki hatayı birebir yeniden ürettim) → `pnpm
+typecheck` (turbo) çalıştırdığımda 24/24 task başarılı, bağımlılık
+paketleri doğru sırada otomatik build edildi. İlk hatayı GitHub
+Actions'ın gerçek bir çalıştırmasından (`mcp__github__actions_list`/
+`get_job_logs`) doğrudan okuyarak doğruladım — iddia değil, gerçek CI
+çıktısı. Düzeltmeyi push ettim; düzeltmeden sonraki çalıştırmanın
+sonucu bu not yazıldığı anda henüz teyit edilmemişti (push sonrası CI
+çalışıyordu) — sonucu ayrıca doğrulayıp gerekirse bu notu güncelleyeceğim.
