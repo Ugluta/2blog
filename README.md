@@ -58,7 +58,9 @@ registry'ye kendi domain modüllerinden kaydeder.
   yalnızca `PUBLISHED` içerik döner. `apps/web`'in SSR sırasında çağıracağı
   yer burasıdır (madde 2/3: web asla DB'ye doğrudan bağlanmaz).
 - `GET/POST /api/v1/categories`, `GET/POST /api/v1/tags` — many-to-many
-  ilişki (`content_categories`, `content_tags`).
+  ilişki (`content_categories`, `content_tags`). Seed script blog
+  yazılarının konu kategorilerini idempotent şekilde oluşturur: Edebiyat,
+  Müzik, Girişim, E-Ticaret, Yapay Zeka.
 - Durum akışı: `DRAFT → REVIEW → APPROVED → SCHEDULED → PUBLISHED → ARCHIVED`
   (`packages/core-content-engine`'de tanımlı, geçersiz geçişler 400 döner).
 
@@ -105,6 +107,23 @@ yazabileceği bir `onCreated`/`onUpdated` callback kabul ediyor — Core hâlâ
   opsiyonel bir `restrictToIds` parametresi kabul ediyor.
 - Works kasıtlı olarak daha gevşek: `category` düz bir string, ayrı bir
   tablo yok (master prompt madde 6: "aynı veri modeli olmak zorunda değil").
+
+## Araçlar (Tools)
+
+Aynı extension-table deseninin dördüncü örneği (`tool_details` — 1:1 CASCADE
+FK, `embedUrl` + opsiyonel `category`/`instructions`). `/tools` admin CRUD +
+`/tools/public` aynı Project/Service/Work deseni, yeni bir izin yok (genel
+`CONTENT_*` kullanılıyor).
+
+- Public detay sayfası (`/araclar/[slug]`) "Aracı Çalıştır" başlığı altında
+  `embedUrl`'i sandboxlı bir `<iframe>` içinde gösterir —
+  `sandbox="allow-scripts allow-forms allow-popups"`, **kasıtlı olarak
+  `allow-same-origin` yok** (bu ikisi birlikte gömülü sayfanın kendi
+  sandbox'ını JS ile kırmasına izin verirdi — SafeImage'inkiyle aynı güven
+  modeli: RBAC kimin `embedUrl` set edebileceğini sınırlar, neye işaret
+  ettiğini değil).
+- `SoftwareApplication` JSON-LD (diğer türlerin Article/CreativeWork'ünden
+  farklı, "araç" semantiğine uygun bir schema.org tipi).
 
 ## Scraper / Data Pool
 
@@ -230,6 +249,7 @@ alıyor (madde 24) — ikinci bir palet kopyası açmak yerine.
 - `/hizmetler`, `/hizmetler/[slug]` — kategori, özellikler, süreç, SSS, CTA
 - `/projelerimiz`, `/projelerimiz/[slug]` — teknolojiler, problem/çözüm/sonuç, demo/repo linkleri
 - `/yaptiklarimiz`, `/yaptiklarimiz/[slug]` — kategori, sonuç, bağlantılar
+- `/araclar`, `/araclar/[slug]` — sandboxlı iframe embed ("Aracı Çalıştır")
 - Header/Footer `/menu/public` ve `/settings/general`'ı gerçekten çağırıyor
   (hard-coded nav yok) — `<title>` template'i de site adını kullanıyor.
 - Her detay sayfası `generateMetadata` ile `seoTitle`/`seoDescription`/
@@ -286,6 +306,8 @@ paneli. `apps/web` gibi hiçbir zaman DB'ye doğrudan bağlanmıyor, her şey
     oluşturma formu, özellikler/süreç/SSS listeleri, CTA.
   - Yaptıklarımız: kategori (serbest metin), teknolojiler, sonuç,
     bağlantılar.
+  - Araçlar (`/araclar`): `embedUrl` (public sayfada sandboxlı iframe'in
+    `src`'i) + kategori (serbest metin) + kullanım talimatı.
 - **Kullanıcılar (`/kullanicilar`):** kullanıcı listesi + role atama
   formu. **Bilinen API kısıtı:** `GET /users` bir kullanıcının mevcut
   rollerini döndürmüyor (yalnızca `/users/me` kendi rollerini görüyor) —

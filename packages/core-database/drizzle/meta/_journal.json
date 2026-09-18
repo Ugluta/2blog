@@ -57,6 +57,13 @@
       "when": 1789681767837,
       "tag": "0007_magical_onslaught",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789699868908,
+      "tag": "0008_mixed_the_hunter",
+      "breakpoints": true
     }
   ]
 }

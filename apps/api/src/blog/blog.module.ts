@@ -7,6 +7,7 @@ import { AiService } from "../core/ai/ai.service";
 import { ProjectsModule } from "./projects/projects.module";
 import { ServicesModule } from "./services/services.module";
 import { WorksModule } from "./works/works.module";
+import { ToolsModule } from "./tools/tools.module";
 import { ScraperModule } from "./scraper/scraper.module";
 
 /**
@@ -15,15 +16,15 @@ import { ScraperModule } from "./scraper/scraper.module";
  * ContentTypeRegistry token — nothing here reaches into ContentModule's
  * internals, and nothing in Core imports from this file.
  *
- * "project"/"service"/"work" register here with an empty extraFieldsSchema
+ * "project"/"service"/"work"/"tool" register here with an empty extraFieldsSchema
  * because their real fields never go through the generic /content
- * extraFields path — ProjectsService/ServicesService/WorksService validate
- * and persist them directly against their own extension tables. Registering
+ * extraFields path — ProjectsService/ServicesService/WorksService/ToolsService
+ * validate and persist them directly against their own extension tables. Registering
  * the typeKey is still required so generic endpoints (e.g. `/content?typeKey=
  * project`) recognize it instead of 400ing as unknown.
  */
 @Module({
-  imports: [ProjectsModule, ServicesModule, WorksModule, ScraperModule, AiModule],
+  imports: [ProjectsModule, ServicesModule, WorksModule, ToolsModule, ScraperModule, AiModule],
 })
 export class BlogModule implements OnModuleInit {
   constructor(
@@ -37,6 +38,7 @@ export class BlogModule implements OnModuleInit {
     this.registry.register({ key: "project", label: "Proje", extraFieldsSchema: noExtraFields });
     this.registry.register({ key: "service", label: "Hizmet", extraFieldsSchema: noExtraFields });
     this.registry.register({ key: "work", label: "Yaptığımız İş", extraFieldsSchema: noExtraFields });
+    this.registry.register({ key: "tool", label: "Araç", extraFieldsSchema: noExtraFields });
 
     this.aiService.promptRegistry.register({
       key: "blog-post-draft",

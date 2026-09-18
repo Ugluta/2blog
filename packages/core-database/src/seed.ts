@@ -78,8 +78,24 @@ async function main() {
       { label: "Hizmetlerimiz", url: "/hizmetler", position: 2 },
       { label: "Projelerimiz", url: "/projelerimiz", position: 3 },
       { label: "Yaptıklarımız", url: "/yaptiklarimiz", position: 4 },
+      { label: "Araçlar", url: "/araclar", position: 5 },
     ]);
     console.log("Created default menu items");
+  }
+
+  // Blog yazılarının konu kategorileri — slug unique olduğu için
+  // idempotent, admin sonradan silse/düzenlese bile tekrar çalıştırmak
+  // onunla çakışmaz (bir kez daha eklemeye çalışır, onConflictDoNothing
+  // sessizce atlar).
+  const defaultCategories = [
+    { slug: "edebiyat", name: "Edebiyat" },
+    { slug: "muzik", name: "Müzik" },
+    { slug: "girisim", name: "Girişim" },
+    { slug: "e-ticaret", name: "E-Ticaret" },
+    { slug: "yapay-zeka", name: "Yapay Zeka" },
+  ];
+  for (const category of defaultCategories) {
+    await db.insert(schema.categories).values(category).onConflictDoNothing({ target: schema.categories.slug });
   }
 
   console.log("Seed complete");

@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import type { CursorPage } from "@2blog/types";
-import { getPosts, getProjects, getServices, getWorks } from "../lib/api";
+import { getPosts, getProjects, getServices, getWorks, getTools } from "../lib/api";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 /** Guards against an infinite loop if the API ever misbehaves — a real site won't hit this. */
@@ -39,11 +39,12 @@ async function collectAll<T extends Sluggable>(fetchPage: (cursor?: string) => P
  * page, so the sitemap stays complete as content grows.
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [posts, projects, services, works] = await Promise.all([
+  const [posts, projects, services, works, tools] = await Promise.all([
     collectAll((cursor) => getPosts(cursor, 100)),
     collectAll((cursor) => getProjects(cursor, 100)),
     collectAll((cursor) => getServices(cursor, 100)),
     collectAll((cursor) => getWorks(cursor, 100)),
+    collectAll((cursor) => getTools(cursor, 100)),
   ]);
 
   const staticRoutes: MetadataRoute.Sitemap = [
@@ -52,6 +53,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/hizmetler`, changeFrequency: "weekly", priority: 0.8 },
     { url: `${SITE_URL}/projelerimiz`, changeFrequency: "weekly", priority: 0.8 },
     { url: `${SITE_URL}/yaptiklarimiz`, changeFrequency: "weekly", priority: 0.8 },
+    { url: `${SITE_URL}/araclar`, changeFrequency: "weekly", priority: 0.8 },
   ];
 
   const toEntry = (basePath: string) => (item: Sluggable): MetadataRoute.Sitemap[number] => ({
@@ -66,6 +68,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...projects.filter((item) => !item.noindex).map(toEntry("/projelerimiz")),
     ...services.filter((item) => !item.noindex).map(toEntry("/hizmetler")),
     ...works.filter((item) => !item.noindex).map(toEntry("/yaptiklarimiz")),
+    ...tools.filter((item) => !item.noindex).map(toEntry("/araclar")),
   ];
 
   return [...staticRoutes, ...dynamicRoutes];

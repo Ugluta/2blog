@@ -5,6 +5,7 @@ export * from "./media";
 export * from "./projects";
 export * from "./services";
 export * from "./works";
+export * from "./tools";
 export * from "./settings";
 export * from "./menu";
 export * from "./scraper";

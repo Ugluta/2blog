@@ -15,6 +15,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/projelerimiz", label: "Projelerimiz", requiredPermission: "CONTENT_VIEW" },
   { href: "/hizmetler", label: "Hizmetler", requiredPermission: "CONTENT_VIEW" },
   { href: "/yaptiklarimiz", label: "Yaptıklarımız", requiredPermission: "CONTENT_VIEW" },
+  { href: "/araclar", label: "Araçlar", requiredPermission: "CONTENT_VIEW" },
   { href: "/medya", label: "Medya", requiredPermission: "MEDIA_VIEW" },
   { href: "/kullanicilar", label: "Kullanıcılar", requiredPermission: "USER_VIEW" },
   { href: "/roller", label: "Roller", requiredPermission: "ROLE_VIEW" },

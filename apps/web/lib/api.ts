@@ -1,4 +1,4 @@
-import type { ApiSuccess, Content, CursorPage, GeneralSettings, MenuItem, Project, SeoSettings, Service, SocialSettings, Work } from "@2blog/types";
+import type { ApiSuccess, Content, CursorPage, GeneralSettings, MenuItem, Project, SeoSettings, Service, SocialSettings, Tool, Work } from "@2blog/types";
 
 const API_URL = process.env.API_INTERNAL_URL ?? "http://localhost:4000";
 
@@ -77,4 +77,14 @@ export async function getWorks(cursor?: string, limit = 20): Promise<CursorPage<
 
 export async function getWorkBySlug(slug: string): Promise<Work | null> {
   return apiGet<Work>(`/works/public/${encodeURIComponent(slug)}`, 60);
+}
+
+export async function getTools(cursor?: string, limit = 20): Promise<CursorPage<Tool>> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (cursor) params.set("cursor", cursor);
+  return (await apiGet<CursorPage<Tool>>(`/tools/public?${params}`, 60)) ?? emptyPage();
+}
+
+export async function getToolBySlug(slug: string): Promise<Tool | null> {
+  return apiGet<Tool>(`/tools/public/${encodeURIComponent(slug)}`, 60);
 }

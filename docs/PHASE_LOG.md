@@ -826,3 +826,129 @@ kapak görselleri ve `apps/admin`'in medya kütüphanesinde — sitewide bir
 gerekçesi kasıtlı olarak yalnızca `coverImage` gibi serbest-URL alanlara
 uygulandı). Sitemap `MAX_PAGES=50` (sayfa başı 100 öğe) sınırıyla —
 gerçek ihtiyaç 5000 içeriği aşarsa büyütülmeli.
+
+## VPS + GitHub Actions Deploy Pipeline (tamamlandı)
+
+Domain henüz yokken (yalnızca VPS IP'si) `docs/ARCHITECTURE.md` madde
+19'un öngördüğü VPS + Docker Compose + Caddy dağıtımını gerçek bir
+CI/CD pipeline'a bağladı. `.github/workflows/deploy.yml` — push'ta
+VPS'e SSH ile bağlanıp `docker compose build && up -d` + migration
+çalıştırıyor, container registry yok (image'lar VPS'in kendisinde build
+ediliyor). `infrastructure/caddy/Caddyfile` domain olmadığı için IP
+üzerinden 3 ayrı portta (web:80, api:8080, admin:8081) düz HTTP
+sunuyor; domain-bazlı bloklar dosyanın sonunda yorumlanmış halde hazır
+duruyor (`docs/DEPLOYMENT.md`'de geçiş adımları var).
+
+**Bu sırada bulunan ve düzeltilen iki gerçek production-readiness açığı:**
+1. `infrastructure/docker-compose.yml`'de postgres/redis/minio `0.0.0.0`'da
+   yayınlanıyordu — bir VPS'te DB/cache/object-store doğrudan internete
+   açık olacaktı. `127.0.0.1:...` bağlamaya çevrildi (`docker compose
+   config` ile doğrulandı) — `pnpm dev` akışı etkilenmedi çünkü o da
+   localhost üzerinden çalışıyor.
+2. `NEXT_PUBLIC_SITE_URL` bir Docker build-arg olarak geçirilmiyordu.
+   Next.js bu değeri `next build` anında (server kodu dahil — sitemap.ts/
+   robots.ts/generateMetadata) bundle'a gömüyor; `web.Dockerfile`'a
+   `ARG`/`ENV` eklenmeden boş değerle build edilecekti. `docker compose
+   config` çıktısıyla doğru değerin build args'a ulaştığı doğrulandı.
+
+**Doğrulama:** `docker compose --env-file ... config` ile hem gerekli
+env değişkenlerinin eksikse hata verdiği (`POSTGRES_PASSWORD must be
+set in .env` vb.) hem de tüm port/build-arg wiring'in doğru
+interpolate olduğu doğrulandı. Gerçek bir VPS'e canlı deploy bu
+ortamda yapılamadı (SSH erişimi kullanıcıda) — pipeline ve config
+mekanik olarak doğrulandı, gerçek sunucu üzerinde ilk çalıştırma
+kullanıcı tarafından yapılacak.
+
+**Kapsam dışı bırakılanlar:** Container registry yok (VPS'in kendisi
+build ediyor — küçük ölçek için yeterli, büyüdükçe GHCR + pull-only
+deploy'a geçilebilir). Otomatik `seed` pipeline'da yok (yalnızca ilk
+kurulumda elle çalıştırılıyor).
+
+## Araçlar (Tools) modülü + blog kategori taksonomisi (tamamlandı)
+
+Kullanıcı talebi: blog yazılarının konu başlıkları (Edebiyat/Müzik/
+Girişim/E-Ticaret/Yapay Zeka) + yeni bir "Araçlar" domain modülü —
+ekle/görüntüle/düzenle/çalıştır/listele. Netleştirme sonrası kapsam:
+Araç "çalıştırma" = site içinde sandboxlı bir iframe olarak gömülü
+mini-uygulama (admin bir `embedUrl` girer); hem public site hem admin
+panelde.
+
+**Uygulama, PHASE 8'in (Projects/Services/Works) birebir aynı "extension
+table" desenini üçüncü kez kanıtlıyor** — Core'un Content Engine'i hâlâ
+`typeKey: "tool"` diye bir şey bilmiyor:
+- `packages/core-database`: `tool_details` tablosu (`embedUrl` +
+  opsiyonel `category`/`instructions`, 1:1 CASCADE FK `contents`'e) —
+  migration `0008_mixed_the_hunter.sql`.
+- `apps/api/src/blog/tools/`: `ToolsService`/`ToolsController`/
+  `ToolsPublicController`/`ToolsModule` — Works'ün servis/controller
+  kodunun satır satır aynı iskeleti, yalnızca alanlar farklı. Yeni
+  Core izni yok (Project/Service/Work emsaliyle aynı kasıtlı karar —
+  genel `CONTENT_VIEW/CREATE/EDIT/DELETE/PUBLISH` kullanılıyor).
+- `blog.module.ts`: `"tool"` typeKey'i registry'ye kaydediliyor
+  (`extraFieldsSchema` boş — gerçek alanlar `tool_details`'tan geçiyor).
+
+**apps/web (`/araclar`, `/araclar/[slug]`):** Liste sayfası diğer
+domain'lerle aynı `ContentCard` grid'i kullanıyor. Detay sayfasında
+"Nasıl kullanılır" (instructions) bölümü + "Aracı Çalıştır" başlıklı
+bir `<iframe>`. `SoftwareApplication` JSON-LD (post/project/work'ün
+Article/CreativeWork'ünden farklı, "araç" semantiğine daha uygun bir
+schema.org tipi).
+
+**Iframe güvenlik kararı — SafeImage'le aynı güven modeli:** `embedUrl`
+admin tarafından set ediliyor ama içeriği (kimin sitesi olduğu)
+kontrol edilmiyor — RBAC sınırı *kimin* set edebileceği, *neye*
+işaret ettiği değil. `sandbox="allow-scripts allow-forms allow-popups"`
+— **kasıtlı olarak `allow-same-origin` yok**: `allow-scripts` +
+`allow-same-origin` birlikte kullanıldığında gömülü sayfa kendi
+sandbox'ını JS ile kırabilir (iyi bilinen bir iframe escape deseni);
+`allow-same-origin`'i çıkarmak bunu yapısal olarak imkansız kılıyor.
+Ayrıca `referrerPolicy="no-referrer"` (kendi sayfa URL'imizi üçüncü
+taraf araca sızdırmamak için) ve top-level navigasyon izni yok
+(clickjacking/redirect-hijack koruması).
+
+**Blog kategorileri:** `packages/core-database/src/seed.ts`'e 5
+kategori eklendi (Edebiyat/Müzik/Girişim/E-Ticaret/Yapay Zeka),
+`categories.slug` unique olduğu için idempotent
+(`onConflictDoNothing`). Menü seed listesine de "Araçlar" → `/araclar`
+eklendi — **var olan (boş olmayan) `menu_items` tablolarında seed bunu
+otomatik eklemez** (mevcut desen: tablo tamamen boşsa seed'lenir,
+admin'in elle sildiği/düzenlediği öğelerle çakışmamak için) — zaten
+kurulu bir ortamda bu menü öğesinin admin panelden (`/menu`) elle
+eklenmesi gerekiyor, tıpkı önceki fazlarda eklenen her menü öğesi gibi.
+
+**Doğrulama (gerçek PostgreSQL + Redis + s3rver'a karşı, Docker
+olmadan):**
+- Migration uygulandı, seed çalıştı — 5 kategori + `tool_details`
+  tablosu gerçekten oluştu (`\d tool_details` ile FK/kolonlar
+  doğrulandı)
+- Admin API ile gerçek bir araç oluşturdum (DRAFT) → public
+  `/tools/public` boş liste + `/tools/public/:slug` 404 (yayınlanmamış
+  içerik gizleniyor, PHASE 8 emsaliyle birebir) → `PUBLISHED`'a
+  transition ettim → public liste ve slug artık doğru döndü
+- `apps/web`'i build edip başlattım: `/araclar` listede gerçek aracı
+  gösterdi, `/araclar/[slug]` detay sayfasında `<iframe>` doğru
+  `src`/`sandbox`/`referrerPolicy` attribute'larıyla render oldu,
+  `SoftwareApplication` JSON-LD doğru üretildi, `sitemap.xml`'de
+  `/araclar` + `/araclar/[slug]` rotaları gerçekten listelendi
+  (curl ile doğrulandı)
+- **İframe'in gerçekten harici içerik render ettiğini kanıtlamak
+  için**: `embedUrl`'i once dış bir domain'e (bu sandbox'ın proxy'si
+  engelliyor, beklenen), sonra ulaşılabilir bir yerel sayfaya
+  (`http://localhost:3000/blog`) çevirdim — Playwright ile ikinci
+  denemede iframe içinde gerçek Blog listesinin render olduğunu
+  ekran görüntüsüyle doğruladım. İlk denemede eski `embedUrl`'in hâlâ
+  görünmesi `lib/api.ts`'in bilinen 60s fetch-cache penceresinden
+  kaynaklandı (önceki fazlarda da dokümante edilen davranış), yeni bir
+  bug değil.
+- `pnpm -r typecheck` → 14/14 paket başarılı; `apps/web` `next build`
+  gerçekten `/araclar` + `/araclar/[slug]` rotalarını üretti
+- Test verisi (oluşturulan araç, elle eklenen menü öğesi) temizlendi;
+  `SKIP_BUCKET_POLICY_FOR_TEST` bypass'ı (s3rver testi için) geri
+  alındı ve `@2blog/core-media` yeniden build edildi
+
+**Kapsam dışı bırakılanlar:** Araç kategorileri (Geliştirici Araçları
+vb.) `work_details.category` gibi düz string — ayrı bir taksonomi
+tablosu yok (Works emsaliyle aynı bilinçli karar). Yüklenen/self-hosted
+HTML/JS araç (admin'in kendi kodunu yükleyip barındırması) kapsam
+dışı — yalnızca harici bir URL'i iframe'leme; bu, kullanıcı
+netleştirme sorusunda üç seçenekten en dar kapsamlısı olarak seçildi.

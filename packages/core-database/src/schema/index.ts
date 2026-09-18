@@ -15,6 +15,7 @@ export * from "./project-details";
 export * from "./service-categories";
 export * from "./service-details";
 export * from "./work-details";
+export * from "./tool-details";
 export * from "./settings";
 export * from "./menu-items";
 export * from "./scraper-sources";
