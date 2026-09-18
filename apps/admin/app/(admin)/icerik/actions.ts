@@ -2,13 +2,17 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { createContentSchema, updateContentSchema } from "@2blog/validation";
-import type { Content, ContentStatus } from "@2blog/types";
+import { createContentSchema, updateContentSchema, createCategorySchema } from "@2blog/validation";
+import type { Category, Content, ContentStatus } from "@2blog/types";
 import { apiFetch, ApiError } from "../../../lib/api";
 
 export interface ContentFormState {
   error?: string;
   fieldErrors?: Record<string, string[] | undefined>;
+}
+
+export interface CategoryFormState {
+  error?: string;
 }
 
 function parseFormFields(formData: FormData) {
@@ -74,4 +78,22 @@ export async function deleteContentAction(id: string): Promise<void> {
   await apiFetch(`/content/${id}`, { method: "DELETE" });
   revalidatePath("/icerik");
   redirect("/icerik");
+}
+
+export async function createCategoryAction(_prevState: CategoryFormState, formData: FormData): Promise<CategoryFormState> {
+  const parsed = createCategorySchema.safeParse({
+    slug: formData.get("slug") as string,
+    name: formData.get("name") as string,
+    description: (formData.get("description") as string) || undefined,
+  });
+  if (!parsed.success) {
+    return { error: "Formu kontrol edin: " + JSON.stringify(parsed.error.flatten().fieldErrors) };
+  }
+  try {
+    await apiFetch<Category>("/categories", { method: "POST", body: JSON.stringify(parsed.data) });
+  } catch (error) {
+    return { error: error instanceof ApiError ? error.message : "Beklenmeyen hata" };
+  }
+  revalidatePath("/icerik");
+  return {};
 }

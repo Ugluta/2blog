@@ -1,10 +1,14 @@
 import Link from "next/link";
-import type { Content, CursorPage } from "@2blog/types";
+import type { Category, Content, CursorPage } from "@2blog/types";
 import { apiFetch } from "../../../lib/api";
 import { STATUS_LABELS } from "../../../lib/content-status-labels";
+import CategoryForm from "./CategoryForm";
 
 export default async function ContentListPage() {
-  const page = await apiFetch<CursorPage<Content>>("/content?typeKey=post&limit=50");
+  const [page, categories] = await Promise.all([
+    apiFetch<CursorPage<Content>>("/content?typeKey=post&limit=50"),
+    apiFetch<Category[]>("/categories"),
+  ]);
 
   return (
     <div>
@@ -13,6 +17,22 @@ export default async function ContentListPage() {
         <Link href="/icerik/yeni" className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-background hover:opacity-90">
           Yeni içerik
         </Link>
+      </div>
+
+      <div className="mb-8 space-y-3">
+        <h2 className="text-sm font-medium text-foreground/70">Kategoriler</h2>
+        {categories.length > 0 ? (
+          <ul className="flex flex-wrap gap-2 text-sm">
+            {categories.map((category) => (
+              <li key={category.id} className="rounded-full border border-border px-3 py-1">
+                {category.name}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-foreground/60">Henüz kategori yok.</p>
+        )}
+        <CategoryForm />
       </div>
 
       {page.items.length === 0 ? (

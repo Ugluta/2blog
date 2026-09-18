@@ -63,7 +63,10 @@ registry'ye kendi domain modüllerinden kaydeder.
   Müzik, Girişim, E-Ticaret, Yapay Zeka. Admin'in İçerik formunda
   checkbox olarak seçilebiliyor; `apps/web`'in `/blog` sayfasında
   `?kategori=<slug>` ile filtrelenip pill/etiket olarak gösteriliyor.
-  Kategori oluşturma/düzenleme hâlâ admin UI'ında yok (yalnızca API).
+  Admin İçerik sayfasında inline bir "Kategori ekle" formu da var
+  (Hizmetler'in `service-categories` formuyla aynı desen) — düzenleme/
+  silme yok, çünkü API'de de `PATCH`/`DELETE /categories` yok
+  (yalnızca `GET`/`POST`).
 - Durum akışı: `DRAFT → REVIEW → APPROVED → SCHEDULED → PUBLISHED → ARCHIVED`
   (`packages/core-content-engine`'de tanımlı, geçersiz geçişler 400 döner).
 

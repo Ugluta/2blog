@@ -1009,10 +1009,36 @@ olmadan):**
 - Test verisi (oluşturulan yazı) temizlendi; `SKIP_BUCKET_POLICY_FOR_TEST`
   bypass'ı geri alındı ve `@2blog/core-media` yeniden build edildi
 
-**Kapsam dışı bırakılanlar:** Kategori yönetimi (oluştur/düzenle/sil)
-admin'de hâlâ yok — yalnızca API'de `GET/POST /categories` var, `POST`
-da `CONTENT_EDIT` istiyor ama admin UI'ı yok (yeni bir kategori eklemek
-için hâlâ ham API çağrısı gerekiyor). Diğer content type'lar
-(Project/Service/Work/Tool) kendi ayrı taksonomilerini kullandığından
-(`service_categories` gibi) bu değişiklik yalnızca `post` tipini,
-yani İçerik formunu kapsıyor.
+**Kapsam dışı bırakılanlar (bu fazda):** Kategori yönetimi (oluştur)
+admin'de hâlâ yoktu — bir sonraki fazda tamamlandı, aşağıya bakın.
+Diğer content type'lar (Project/Service/Work/Tool) kendi ayrı
+taksonomilerini kullandığından (`service_categories` gibi) bu
+değişiklik yalnızca `post` tipini, yani İçerik formunu kapsıyor.
+
+## Blog kategori oluşturma UI'ı (tamamlandı)
+
+Bir önceki fazın "kapsam dışı" notunu kapattı: admin'in İçerik
+sayfasına, Hizmetler'in `service-categories` için zaten kullandığı
+**birebir aynı** desenle (`CategoryForm.tsx` inline formu, aynı
+slug/ad/açıklama alanları) bir "Kategori ekle" formu eklendi —
+`createCategorySchema` (`packages/validation/src/taxonomy.ts`) PHASE
+6/7'den beri vardı ama admin'de hiç kullanılmıyordu. `POST /categories`
+zaten `CONTENT_EDIT` istiyordu, yeni bir izin gerekmedi.
+
+**Bilinçli olarak eklenmeyen:** Kategori düzenleme/silme — API'de
+`PATCH`/`DELETE /categories` hiç yok (yalnızca `GET`/`POST`), tıpkı
+`service-categories`'in de yalnızca list+create olması gibi (aynı
+emsal, ilgili PHASE 8 notunda da aynı kısıt var). Bunu eklemek API
+tarafında yeni uç noktalar gerektirir — bu fazın kapsamı yalnızca var
+olan API yüzeyini admin'e bağlamaktı.
+
+**Doğrulama (gerçek PostgreSQL + Redis + s3rver'a karşı, Docker
+olmadan, gerçek Chromium/Playwright ile):** Playwright ile İçerik
+sayfasında "Test Kategorisi" adında slug/ad/açıklamalı bir kategori
+oluşturdum → chip listesinde anında göründüğünü (revalidatePath)
+ekran görüntüsüyle doğruladım → API'den doğrudan çekip açıklamanın da
+doğru kaydedildiğini teyit ettim → aynı slug'la tekrar oluşturmayı
+denedim (curl ile) → 409 döndüğünü doğruladım (duplicate slug guard'ı
+zaten çalışıyordu, bu fazda dokunulmadı) → test kategorisini temizledim
+(DELETE endpoint'i olmadığı için doğrudan SQL ile). `pnpm -r typecheck`
+→ 14/14 paket başarılı.
