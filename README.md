@@ -366,7 +366,9 @@ cp .env.example .env
 pnpm install
 
 # Postgres / Redis / MinIO'yu ayağa kaldır
-docker compose -f infrastructure/docker-compose.yml up -d postgres redis minio
+# --env-file .env şart: docker-compose.yml -f ile çağrıldığında proje dizini
+# infrastructure/ oluyor, Compose .env'i orada arıyor (repo kökünde değil)
+docker compose --env-file .env -f infrastructure/docker-compose.yml up -d postgres redis minio
 
 pnpm dev
 ```
@@ -425,5 +427,5 @@ admin:8081) — `postgres`/`redis`/`minio` yalnızca `127.0.0.1`'e bağlı,
 dışarıdan erişilemez.
 
 ```bash
-docker compose -f infrastructure/docker-compose.yml up -d --build
+docker compose --env-file .env -f infrastructure/docker-compose.yml up -d --build
 ```

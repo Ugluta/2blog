@@ -87,11 +87,21 @@ olarak açıklıyor.
 
 ```bash
 cd ~/2blog
-docker compose -f infrastructure/docker-compose.yml build
-docker compose -f infrastructure/docker-compose.yml up -d
-docker compose -f infrastructure/docker-compose.yml exec -T api pnpm --filter @2blog/core-database migrate
-docker compose -f infrastructure/docker-compose.yml exec -T api pnpm --filter @2blog/core-database seed
+docker compose --env-file .env -f infrastructure/docker-compose.yml build
+docker compose --env-file .env -f infrastructure/docker-compose.yml up -d
+docker compose --env-file .env -f infrastructure/docker-compose.yml exec -T api pnpm --filter @2blog/core-database migrate
+docker compose --env-file .env -f infrastructure/docker-compose.yml exec -T api pnpm --filter @2blog/core-database seed
 ```
+
+**Neden `--env-file .env`:** `-f infrastructure/docker-compose.yml` ile
+çağrıldığında Compose'un proje dizini `infrastructure/` oluyor (compose
+dosyasının kendi klasörü) — `.env`'i orada arıyor, repo kökünde değil,
+`POSTGRES_PASSWORD`/`STORAGE_ACCESS_KEY`/`NEXT_PUBLIC_SITE_URL` gibi
+zorunlu değişkenleri bulamayıp hata veriyor. `.github/workflows/
+deploy.yml`'nin bu hatayı almamasının sebebi `docker compose`'dan önce
+`source .env` ile tüm değişkenleri shell'e export etmesi — Compose,
+shell'in kendi ortam değişkenlerini de kontrol ediyor. Elle
+çalıştırılan komutlarda en basit çözüm `--env-file .env`.
 
 Seed, `.env`'deki `SEED_ADMIN_EMAIL`/`SEED_ADMIN_PASSWORD` ile ilk
 SUPER_ADMIN kullanıcısını oluşturur (idempotent — tekrar çalıştırmak
@@ -148,11 +158,19 @@ gerek yok.
    `"80:80"`/`"443:443"`'e geri döndürün (8080/8081 satırlarını kaldırın).
 4. `.env`'de `WEB_DOMAIN`/`ADMIN_DOMAIN`/`API_DOMAIN` + `NEXT_PUBLIC_SITE_URL`/
    `NEXT_PUBLIC_ADMIN_URL`/`API_URL`/`CORS_ORIGINS`'i gerçek domain'lerle güncelleyin.
-5. `docker compose -f infrastructure/docker-compose.yml up -d --build` —
+5. `docker compose --env-file .env -f infrastructure/docker-compose.yml up -d --build` —
    Caddy otomatik olarak Let's Encrypt'ten TLS sertifikası alır.
 
 ## Sorun giderme
 
+- **`error while interpolating services.postgres.environment.POSTGRES_PASSWORD:
+  required variable POSTGRES_PASSWORD is missing a value` (veya
+  `STORAGE_ACCESS_KEY`/`NEXT_PUBLIC_SITE_URL` için aynı hata):** `.env`
+  var ve doğru dolu olsa bile, `docker compose -f infrastructure/
+  docker-compose.yml ...` komutunu `--env-file .env` olmadan doğrudan
+  çalıştırırsanız bu hatayı alırsınız — yukarıda "Neden `--env-file .env`"
+  kutusuna bakın. Gerçek bir ilk canlı deploy denemesinde tam olarak bu
+  hatayla karşılaşıldı, kök nedeni burada belgelendi.
 - **`docker compose exec api ...` "no such service" hatası verirse:** `up -d`
   henüz tamamlanmamış olabilir, `docker compose ps` ile `api`'nin `healthy`
   olduğunu doğrulayın.
