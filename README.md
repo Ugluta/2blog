@@ -33,6 +33,13 @@ packages/
 - `POST /api/v1/auth/login` ayrıca Redis tabanlı çift rate limit'e sahip:
   IP başına 15dk'da 20 deneme, email başına 15dk'da 5 **başarısız**
   deneme (başarılı login'de sıfırlanır) — `login-rate-limiter.service.ts`.
+- `apps/api/src/main.ts` `@fastify/helmet` kayıtlı — CSP, HSTS,
+  `X-Content-Type-Options: nosniff`, `X-Frame-Options`, vb. her
+  response'ta set ediliyor (`@fastify/helmet@^11`, Nest 10'un
+  bundluduğu Fastify 4 ile uyumlu son major — `^13` Fastify 5 istiyor,
+  denendi ve gerçekten çöktü). Caddy production'da bazılarını zaten
+  edge'de set ediyor; bu, yerel geliştirme ve API'ye doğrudan erişim
+  için savunma derinliği sağlıyor.
 - `GET /api/v1/users/me` — geçerli access token yeterli.
 - `GET/POST /api/v1/roles`, `POST /api/v1/roles/:id/permissions`,
   `GET /api/v1/permissions`, `POST /api/v1/users/:id/roles` — `ROLE_VIEW` /

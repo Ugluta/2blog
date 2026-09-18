@@ -1090,3 +1090,48 @@ düzeltmeden sonraki başarıyı GitHub Actions'ın gerçek çalıştırmaların
 iddia değil, gerçek CI çıktısı: ilk push'ta `verify` job'ı
 `packages/core-auth`'ta TS2307 ile başarısız oldu, düzeltmeden sonraki
 push'ta `pnpm typecheck` adımı gerçekten yeşil tamamlandı.
+
+## Helmet güvenlik header'ları (tamamlandı)
+
+Kod incelemesinde bulunan bir eksik: `apps/api/src/main.ts`'te yalnızca
+CORS vardı — CSP/X-Frame-Options/X-Content-Type-Options/HSTS gibi
+standart güvenlik header'ları hiç set edilmiyordu. `@fastify/helmet`
+eklendi (API Fastify tabanlı — Express'in `helmet` paketi buraya
+uymaz, `@nestjs/platform-fastify`'ın Fastify plugin sistemi ayrı bir
+paket gerektiriyor).
+
+**Bulunan ve düzeltilen gerçek bug:** İlk denemede `@fastify/helmet`'in
+en güncel major sürümü (`^13`) kuruldu ve API **gerçekten çökerek
+başlamadı**: `FastifyError: fastify-plugin: @fastify/helmet - expected
+'5.x' fastify version, '4.28.1' is installed`. Kök neden: bu proje
+NestJS 10.x kullanıyor (`@nestjs/platform-fastify@^10`), ve Nest 10
+hâlâ Fastify 4'ü bundluyor — `@fastify/helmet@13` ise Fastify 5
+gerektiriyor. Düzeltme: `@fastify/helmet@^11` (Fastify 4 ile uyumlu son
+major) kuruldu, API sorunsuz başladı.
+
+Ayrıca bu API restart denemeleri sırasında, bu ortamda **önceki bir
+oturum kalıntısı** fark edildi: port 4000'i işgal eden, `dist/main.js`'i
+doğrudan çalıştıran eski bir node process (muhtemelen konteynerin
+kendi persistence/restart mekanizmasından kalma) — yeni API başlatma
+denemesi `EADDRINUSE` ile çakıştı. Bu, uygulama kodunun bir hatası
+değil, bu test ortamının kendine özgü bir durumuydu; süreci öldürüp
+temiz başlatarak çözüldü.
+
+**Doğrulama:** Gerçek bir API instance'ını ayağa kaldırıp
+`curl -sI http://localhost:4000/api/v1/health` ile tüm header'ların
+(`Content-Security-Policy`, `Strict-Transport-Security`,
+`X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`,
+`Referrer-Policy`, vb.) gerçekten döndüğünü doğruladım. Regresyon
+kontrolü: login akışı, public `/tools/public` endpoint'i ve CORS
+preflight (`OPTIONS`) hâlâ doğru çalışıyor (204/200, beklenen
+davranış — helmet hiçbirini bozmadı). `pnpm -r typecheck` → 14/14
+paket başarılı.
+
+**Bilinçli kapsam kararı:** CSP varsayılan (kısıtlayıcı) ayarlarıyla
+bırakıldı — API hiçbir zaman HTML döndürmüyor (yalnızca JSON), bu
+yüzden CSP'nin gerçek bir etkisi yok ama ileride (örn. Swagger/OpenAPI
+UI eklenirse) hazır bir güvenlik katmanı olarak duruyor. Caddy zaten
+production'da bazı bu header'ları edge'de set ediyordu
+(`infrastructure/caddy/Caddyfile`) — bu değişiklik savunma derinliği
+sağlıyor: yerel geliştirmede (Caddy yok) ve API'ye doğrudan erişilirse
+de aynı header'lar duruyor.
