@@ -1084,9 +1084,9 @@ script → turbo → doğru sıra).
 checkout simüle ettim → `pnpm -r typecheck` gerçekten aynı hatayla
 başarısız oldu (CI'daki hatayı birebir yeniden ürettim) → `pnpm
 typecheck` (turbo) çalıştırdığımda 24/24 task başarılı, bağımlılık
-paketleri doğru sırada otomatik build edildi. İlk hatayı GitHub
-Actions'ın gerçek bir çalıştırmasından (`mcp__github__actions_list`/
-`get_job_logs`) doğrudan okuyarak doğruladım — iddia değil, gerçek CI
-çıktısı. Düzeltmeyi push ettim; düzeltmeden sonraki çalıştırmanın
-sonucu bu not yazıldığı anda henüz teyit edilmemişti (push sonrası CI
-çalışıyordu) — sonucu ayrıca doğrulayıp gerekirse bu notu güncelleyeceğim.
+paketleri doğru sırada otomatik build edildi. Hem ilk hatayı hem
+düzeltmeden sonraki başarıyı GitHub Actions'ın gerçek çalıştırmalarından
+(`mcp__github__actions_list`/`get_job_logs`) doğrudan doğruladım —
+iddia değil, gerçek CI çıktısı: ilk push'ta `verify` job'ı
+`packages/core-auth`'ta TS2307 ile başarısız oldu, düzeltmeden sonraki
+push'ta `pnpm typecheck` adımı gerçekten yeşil tamamlandı.
