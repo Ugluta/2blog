@@ -171,6 +171,21 @@ gerek yok.
   çalıştırırsanız bu hatayı alırsınız — yukarıda "Neden `--env-file .env`"
   kutusuna bakın. Gerçek bir ilk canlı deploy denemesinde tam olarak bu
   hatayla karşılaşıldı, kök nedeni burada belgelendi.
+- **`pull access denied for minio/minio, repository does not exist`:**
+  MinIO resmi image'ını Docker Hub'dan Quay.io'ya taşıdı — bu repo
+  `quay.io/minio/minio` kullanıyor (`docker-compose.yml`), en son
+  `git pull` ile güncel değilseniz eski `minio/minio` referansını
+  almış olabilirsiniz.
+- **`failed to bind host port 127.0.0.1:5432/tcp: address already in use`:**
+  VPS'te Docker dışı, yerel bir PostgreSQL zaten 5432'de çalışıyor
+  (bazı VPS imajları bunu önceden kurulu getiriyor) — `ss -tlnp | grep
+  5432` ile doğrulayın. `.env`'e `POSTGRES_HOST_PORT=5433` (veya boşta
+  başka bir port) ekleyip `docker compose ... up -d`'yi tekrar
+  çalıştırın; container'ın kendi içi hâlâ 5432, `DATABASE_URL` hiç
+  değişmez, yalnızca host'a açılan port taşınır. Aynı çakışma redis
+  (6379) veya minio (9000/9001) için de olursa aynı mantıkla
+  `docker-compose.yml`'e benzer bir `_HOST_PORT` değişkeni eklenebilir
+  (şu an yalnızca postgres için var, gerçek ihtiyaç çıkarsa genişletin).
 - **`docker compose exec api ...` "no such service" hatası verirse:** `up -d`
   henüz tamamlanmamış olabilir, `docker compose ps` ile `api`'nin `healthy`
   olduğunu doğrulayın.

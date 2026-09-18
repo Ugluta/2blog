@@ -1296,3 +1296,18 @@ ve MinIO'nun kendi güncel resmi dokümantasyonunu çektim
 — artık `quay.io/minio/minio` kullanıyorlar, `minio/minio` (Docker Hub)
 değil. `infrastructure/docker-compose.yml`'deki image referansı
 `quay.io/minio/minio:latest`'e güncellendi.
+
+**Bug 4 — VPS'te zaten yerel bir postgres 5432'yi kullanıyordu:** Bu
+bug 3'ten farklı bir sınıfta — kod ya da bu repoyla ilgili değil,
+**bu spesifik VPS'in ortamına özgü** bir çakışma (`ss -tlnp | grep
+5432` ile `postgres` adında Docker-dışı bir süreç zaten o portta
+olduğu doğrulandı). `docker-compose.yml`'in `postgres` servisine
+opsiyonel bir `POSTGRES_HOST_PORT` değişkeni eklendi (varsayılan hâlâ
+5432 — `pnpm dev` akışı ve `.env.example` **hiç değişmedi**, yalnızca
+bu VPS'in `.env`'inde `POSTGRES_HOST_PORT=5433` set edilerek çakışma
+aşıldı). Container'ın kendi içindeki port her zaman 5432 kaldığından
+(`DATABASE_URL=...@postgres:5432/...` hiç değişmiyor), bu yalnızca
+host'tan dışarıdan `psql` ile bağlanmak isteyenler için bir
+kolaylık — uygulamanın kendisi hiç etkilenmiyor. `docker compose
+config` ile hem varsayılan (5432) hem override (5433) davranışı
+doğrulandı.

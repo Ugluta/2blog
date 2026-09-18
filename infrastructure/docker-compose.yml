@@ -17,8 +17,15 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-twoblog}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    # Host-side port is configurable (POSTGRES_HOST_PORT) for machines that
+    # already run their own postgres on 5432 (e.g. a VPS image that ships
+    # one) — the container's own port stays 5432 either way, so api/worker
+    # (which reach it as `postgres:5432` over the compose network) are
+    # completely unaffected. Local dev's default .env has no override, so
+    # `pnpm dev` connecting to localhost:5432 (per .env.example) keeps
+    # working unchanged.
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 5s
