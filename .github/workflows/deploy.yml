@@ -27,10 +27,23 @@ jobs:
   verify:
     # Gates the deploy job below — a push that fails typecheck never
     # reaches the VPS. No lint/test script exists in this repo yet
-    # (pnpm -r typecheck is the strongest automated check there is);
-    # full `next build` isn't run here since it needs production env
-    # vars (NEXT_PUBLIC_SITE_URL etc.) that only live in the VPS's own
-    # .env, not in CI.
+    # (typecheck is the strongest automated check there is); full
+    # `next build` isn't run here since it needs production env vars
+    # (NEXT_PUBLIC_SITE_URL etc.) that only live in the VPS's own .env,
+    # not in CI.
+    #
+    # Must be `pnpm typecheck` (the root script, which is `turbo run
+    # typecheck`), NOT `pnpm -r typecheck` — turbo.json declares
+    # typecheck as dependsOn: ["^build"], so turbo builds a package's
+    # workspace dependencies (e.g. @2blog/types) before typechecking
+    # anything that imports their compiled .d.ts output. Plain `pnpm -r`
+    # ignores that graph entirely and typechecks packages in whatever
+    # order it likes — it only "worked" in local testing throughout this
+    # project because `dist/` folders were already built from earlier,
+    # unrelated commands in the same working tree. A genuinely fresh
+    # checkout (this CI job, confirmed by an actual failed run) has no
+    # dist/ folders yet, so packages/core-auth (imports @2blog/types)
+    # failed with TS2307 "Cannot find module '@2blog/types'".
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -44,7 +57,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm -r typecheck
+      - run: pnpm typecheck
 
   deploy:
     needs: verify
