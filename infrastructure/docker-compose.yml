@@ -39,7 +39,10 @@ services:
       retries: 10
 
   minio:
-    image: minio/minio:latest
+    # MinIO moved their official image off Docker Hub (minio/minio is gone
+    # there — confirmed via Docker Hub's API returning "object not found")
+    # to Quay.io; their own current docs use quay.io/minio/minio.
+    image: quay.io/minio/minio:latest
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:

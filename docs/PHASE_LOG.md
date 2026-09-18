@@ -1282,3 +1282,17 @@ compose config` ile interpolation) doğrulanmış kısımlarındaydı — asıl
 gerçek bir deploy denemesinin, ne kadar dikkatli statik doğrulama
 yapılırsa yapılsın bulamayacağı sınıfta bir gerçek doğrulama
 sağladığının somut kanıtı.
+
+**Bug 3 — `minio/minio:latest` artık Docker Hub'da yok:** İki build
+bug'ı düzeltilip 4 image de gerçekten build edildikten sonra,
+`docker compose up -d` bu kez `pull access denied for minio/minio,
+repository does not exist or may require 'docker login'` hatasıyla
+başarısız oldu. Bu, kod tabanındaki bir hata değil, **MinIO'nun kendi
+container registry'sini değiştirmesinden** kaynaklanan gerçek bir dış
+değişiklik — Docker Hub'ın kendi API'siyle doğrudan doğruladım
+(`hub.docker.com/v2/repositories/minio/minio/` → `"object not found"`)
+ve MinIO'nun kendi güncel resmi dokümantasyonunu çektim
+(`raw.githubusercontent.com/minio/minio/master/docs/docker/README.md`)
+— artık `quay.io/minio/minio` kullanıyorlar, `minio/minio` (Docker Hub)
+değil. `infrastructure/docker-compose.yml`'deki image referansı
+`quay.io/minio/minio:latest`'e güncellendi.
